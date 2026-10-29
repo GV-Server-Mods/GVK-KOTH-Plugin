@@ -47,6 +47,8 @@ namespace GVK.Koth
         public KothData Data { get; private set; }
         public ZoneManager Zones { get; private set; }
         public ModApi Api { get; private set; }
+        public MesBridge Mes { get; private set; }
+        public ClientSync Sync { get; private set; }
 
         public bool SessionLoaded => Zones != null;
 
@@ -78,6 +80,8 @@ namespace GVK.Koth
             try
             {
                 Data = new KothData(DataPath);
+                Mes = new MesBridge();
+                Sync = new ClientSync();
                 var zones = new ZoneManager(this, Data, Announce);
                 zones.Rebuild();
                 zones.Start();
@@ -108,6 +112,8 @@ namespace GVK.Koth
 
             Api = null;
             Zones = null;
+            Sync = null;
+            Mes = null;
             Data?.Dispose();
             Data = null;
         }

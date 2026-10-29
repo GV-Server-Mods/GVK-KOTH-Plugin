@@ -72,3 +72,15 @@ The old GVK_Settings rule scripts still run until cutover, so test at a spot wit
 | 3 | A test mod with the `GvkKothApi` class from `docs/API.md` calls `AddPoints(factionId, 3, "Test", "API test")` | Chat and Discord say "[TAG] gained 3 KOTH points: API test"; `ScoreLog.csv` has a line with source "API: Test". This also confirms mods reach the plugin through mod messages. |
 | 4 | Same with -100 on a faction with fewer points | The total stops at 0. |
 | 5 | The test mod registers `AddZoneListener` and you open and close a zone | The callback fires with the zone name and true, then false. |
+
+## Stage 7: Flying KOTH spawn (plugin side)
+Setup: a zone with `Attach` NpcTag, `Activation` Slot, `SpawnGroup` set to the airship's spawn group (with `[RivalAiSpawn:true]`), X/Y/Z at the spawn point, its behavior carrying `GVK-KOTH=<Name>;`, and a slot whose Pool contains only it, starting in a few minutes.
+
+| # | Do | Pass when |
+|---|---|---|
+| 1 | Wait for the slot | The log shows "spawned '<SpawnGroup>' for slot"; the airship appears upright at X/Y/Z; the zone opens on it once MES writes the behavior. This also confirms the plugin can read the MES API. |
+| 2 | Restart Torch during the slot | No second airship spawns. |
+| 3 | Slot ends | MES despawns the airship (its own behavior timer); the zone ends quietly. |
+
+## Zone state for players (plugin side)
+Until the GVK_Settings client script exists, check with a debug client mod or the server log only: the plugin sends on channel 47410 once a second while a zone is open (see `docs/CLIENT_PROTOCOL.md`).

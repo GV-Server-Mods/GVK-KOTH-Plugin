@@ -8,6 +8,7 @@ using GVK.Koth.Core.Config;
 using GVK.Koth.Services;
 using Sandbox.ModAPI;
 using VRage.Game.ModAPI;
+using VRageMath;
 
 namespace GVK.Koth.Zones
 {
@@ -35,6 +36,7 @@ namespace GVK.Koth.Zones
         // Slot name -> start of the occurrence that is running now.
         private readonly Dictionary<string, DateTime> _runningSlots = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _warningsSent = new HashSet<string>();
+        private readonly HashSet<string> _spawnFailuresReported = new HashSet<string>();
 
         private double _secondsSinceSave;
 
@@ -118,6 +120,7 @@ namespace GVK.Koth.Zones
             _npc.Links.Apply(zones.Where(z => z.Active && z.Profile.Mode != ZoneMode.RulesOnly).ToList());
             _rules.Apply(zones, now);
             PublishActiveProfiles(zones);
+            _plugin.Sync?.Tick(this, dt, now);
 
             CheckWeeklyRollup(now);
 
@@ -253,6 +256,7 @@ namespace GVK.Koth.Zones
                     ? $" and {((long)result.PointsEach * profile.CreditsPerPoint).ToString("N0", CultureInfo.InvariantCulture)} SC"
                     : "";
                 _announce.Both($"{profile.Name}: {string.Join(" ", tags)} scored {result.PointsEach} points{credits} each.");
+                _plugin.Sync?.Completed(zone, tags);
             }
 
             if (result.LootDrops > 0)
@@ -305,7 +309,10 @@ namespace GVK.Koth.Zones
                 {
                     string zone = GetOrPick(slot, start);
                     if (zone != null)
+                    {
                         picked.Add(zone);
+                        SpawnIfNeeded(slot, start, zone);
+                    }
                     _runningSlots[slot.Name] = start;
                 }
                 else
@@ -318,6 +325,58 @@ namespace GVK.Koth.Zones
             // Forget picks older than a week.
             _data.State.SlotPicks.RemoveAll(p => p.StartUtc < now.AddDays(-8));
             return picked;
+        }
+
+        public ZoneProfile Profile(string name) =>
+            name == null ? null : Config.Zones.FirstOrDefault(z => string.Equals(z.Name, name, StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>Where a profile is now: its fixed zone, an open NPC zone of that name, or its configured X/Y/Z.</summary>
+        public Vector3D ProfilePosition(ZoneProfile profile)
+        {
+            var zone = Find(profile.Name) ?? _npc.Zones.FirstOrDefault(z => z.Active && string.Equals(z.Name, profile.Name, StringComparison.OrdinalIgnoreCase));
+            return zone?.Center ?? new Vector3D(profile.X, profile.Y, profile.Z);
+        }
+
+        /// <summary>
+        /// The zone the next slot will run and when it starts (picked early so players know which KOTH is next).
+        /// </summary>
+        public (ZoneProfile Profile, DateTime StartUtc)? NextSlotZone(DateTime now)
+        {
+            var next = Config.Slots
+                .Where(s => s.Enabled && s.Pool != null && s.Pool.Count > 0 && s.DurationMinutes > 0 && !_runningSlots.ContainsKey(s.Name))
+                .Select(s => (Slot: s, Start: WeeklySchedule.NextStart(s.Start, now)))
+                .OrderBy(x => x.Start)
+                .FirstOrDefault();
+            if (next.Slot == null)
+                return null;
+
+            var profile = Profile(GetOrPick(next.Slot, next.Start));
+            return profile == null ? ((ZoneProfile, DateTime)?)null : (profile, next.Start);
+        }
+
+        /// <summary>Spawns a picked zone's SpawnGroup (Flying KOTH) once per slot occurrence.</summary>
+        private void SpawnIfNeeded(SlotConfig slot, DateTime start, string zoneName)
+        {
+            var profile = Profile(zoneName);
+            if (profile == null || string.IsNullOrWhiteSpace(profile.SpawnGroup))
+                return;
+
+            var pick = _data.State.SlotPicks.FirstOrDefault(p =>
+                string.Equals(p.Slot, slot.Name, StringComparison.OrdinalIgnoreCase) && p.StartUtc == start);
+            if (pick == null || pick.Spawned)
+                return;
+
+            var position = new Vector3D(profile.X, profile.Y, profile.Z);
+            if (_plugin.Mes.Spawn(profile.SpawnGroup, position))
+            {
+                pick.Spawned = true;
+                _data.SaveState();
+                Plugin.Log.Info($"GVK KOTH: spawned '{profile.SpawnGroup}' for slot '{slot.Name}' ({zoneName}).");
+            }
+            else if (_spawnFailuresReported.Add($"{slot.Name}|{start:o}"))
+            {
+                _plugin.Alerts.Send($"Slot '{slot.Name}': MES didn't spawn '{profile.SpawnGroup}' for {zoneName}; retrying every check.");
+            }
         }
 
         /// <summary>The zone a slot occurrence uses, picked at random once and saved.</summary>
@@ -353,15 +412,14 @@ namespace GVK.Koth.Zones
                 if (!_warningsSent.Add(key))
                     continue;
 
-                string zoneName = GetOrPick(slot, nextStart);
-                var zone = Find(zoneName);
-                if (zone == null)
+                var profile = Profile(GetOrPick(slot, nextStart));
+                if (profile == null)
                     continue;
 
-                string text = $"KOTH {zone.Name} opens in {warning} minutes ({nextStart:HH:mm} UTC). {LootDelivery.Gps("KOTH " + zone.Name, zone.Center)}";
+                string text = $"KOTH {profile.Name} opens in {warning} minutes ({nextStart:HH:mm} UTC). {LootDelivery.Gps("KOTH " + profile.Name, ProfilePosition(profile))}";
                 _announce.Chat(text);
                 string ping = string.IsNullOrWhiteSpace(Config.DiscordSlotWarningPing) ? "" : Config.DiscordSlotWarningPing + " ";
-                _announce.Discord(ping + $"KOTH {zone.Name} opens in {warning} minutes ({nextStart:HH:mm} UTC).");
+                _announce.Discord(ping + $"KOTH {profile.Name} opens in {warning} minutes ({nextStart:HH:mm} UTC).");
             }
         }
 

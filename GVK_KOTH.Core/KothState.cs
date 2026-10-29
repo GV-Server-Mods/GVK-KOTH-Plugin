@@ -70,5 +70,8 @@ namespace GVK.Koth.Core
         public string Slot { get; set; } = "";
         public DateTime StartUtc { get; set; }
         public string Zone { get; set; } = "";
+
+        /// <summary>The zone's SpawnGroup (Flying KOTH) was spawned for this occurrence.</summary>
+        public bool Spawned { get; set; }
     }
 }

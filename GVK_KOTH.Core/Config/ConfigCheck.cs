@@ -37,6 +37,12 @@ namespace GVK.Koth.Core.Config
                 if (zone.Attach == ZoneAttach.Coordinates && zone.X == 0 && zone.Y == 0 && zone.Z == 0)
                     problems.Add($"{label}: Attach is Coordinates but X, Y and Z are all 0.");
 
+                if (!string.IsNullOrWhiteSpace(zone.SpawnGroup) && zone.X == 0 && zone.Y == 0 && zone.Z == 0)
+                    problems.Add($"{label}: SpawnGroup is set, so X, Y and Z must be the spawn point, but they are all 0.");
+
+                if (!string.IsNullOrWhiteSpace(zone.SpawnGroup) && zone.Attach != ZoneAttach.NpcTag)
+                    problems.Add($"{label}: SpawnGroup only makes sense with Attach NpcTag (the spawned grid carries the zone).");
+
                 if (zone.Attach == ZoneAttach.Coordinates && zone.Activation == ZoneActivation.Lifetime)
                     problems.Add($"{label}: Activation Lifetime only works with Attach NpcTag.");
 
