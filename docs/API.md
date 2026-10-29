@@ -5,7 +5,14 @@ Server-side mods (for example SiegeableSafeZones) can change KOTH season points 
 The API uses mod messages, like the WeaponCore API. Mod messages never leave the server, so a client can't call it.
 
 ## MES sandbox booleans
-For every zone profile (except rule-only ones) the plugin keeps `GVK_KOTH_<Name>_Active` true while any zone with that name is open, e.g. `GVK_KOTH_KharToba_Active`. Use it in MES conditions like any other sandbox boolean.
+For every zone profile (except rule-only ones) the plugin keeps `GVK_KOTH_<Name>_Active` true while any zone with that name is open, e.g. `GVK_KOTH_KharToba_Active`. The plugin sets it with `MyAPIGateway.Utilities.SetVariable`, which is what MES reads (`GetVariable<bool>`), so it works anywhere MES takes a sandbox boolean:
+- Spawn conditions: `[SandboxVariables:GVK_KOTH_KharToba_Active]`.
+- RivalAI conditions: `[CheckTrueSandboxBooleans:true]` with `[TrueSandboxBooleans:GVK_KOTH_KharToba_Active]`, or `[CheckFalseSandboxBooleans:true]` with `[FalseSandboxBooleans:...]`.
+
+These are game sandbox variables, so the game saves them with the world (the only KOTH data that is). The plugin rewrites every one at startup, so a stale value never survives a restart.
+
+## MES spawns (Flying KOTH)
+The plugin calls MES's `CustomSpawnRequest` (MES spawn type OtherNPC). The spawn group's conditions need `[RivalAiSpawn:true]` (or `RivalAiAnySpawn`, `RivalAiAtmosphericSpawn`, `RivalAiSpaceSpawn`), or MES won't pick it. MES writes the behavior profile into the remote control's CustomData before the grid spawns, so a `GVK-KOTH=<Name>;` line in that behavior is there as soon as the grid appears.
 
 ## Endpoints
 A mod sends the string `"ApiEndpointRequest"` on channel `74100741` and receives a `Dictionary<string, Delegate>`:
