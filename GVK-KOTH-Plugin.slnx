@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="GVK_KOTH/GVK_KOTH.csproj" />
+  <Project Path="GVK_KOTH.Core/GVK_KOTH.Core.csproj" />
+  <Project Path="GVK_KOTH.Tests/GVK_KOTH.Tests.csproj" />
+</Solution>

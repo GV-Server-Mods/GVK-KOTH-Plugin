@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PluginManifest xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Guid>a8e77547-5e9c-4a23-99ea-658d20d274d9</Guid>
+  <Version>0.1.0</Version>
+  <Name>GVK KOTH</Name>
+  <Description>King of the Hill for GV: Deserts of Kharak: shared capture, slots, NPC zones, KOTH rules, season scores and Discord.</Description>
+  <Author>GV Server Mods</Author>
+</PluginManifest>
