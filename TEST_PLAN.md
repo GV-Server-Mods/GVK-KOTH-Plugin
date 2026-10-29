@@ -96,5 +96,6 @@ The test server needs a GVK_Settings build from that branch (published to a test
 | 5 | Fly into the open zone | The capture panel appears on the left (name, %, bar, counted); it hides when you leave. |
 | 6 | Approach within 1 km of the zone edge | A faint orange wireframe sphere marks the capture radius. |
 | 7 | Complete a bar | Firework bursts above the zone for players within 5 km. |
+| 7b | Flying KOTH: fly near the moving airship | The boundary sphere moves smoothly with it (no once-a-second jumps); the panel appears as soon as you're inside. |
 | 8 | Stop the plugin (or wait with no zones) | Markers and the panel disappear within 30 seconds. |
 | 9 | Profiler with the map open near an open KOTH | No noticeable cost from GVK_Settings compared with no KOTH. |

@@ -12,7 +12,7 @@ UTF-8 text, one item per line, fields separated by `|`. Numbers use `.` as the d
 
 ```
 GVKKOTH|1
-O|KharToba|4115.2|38891.6|26152.7|1500|0.420|3
+O|KharToba|4115.2|38891.6|26152.7|1500|0.420|3|0
 N|Kalash|8815.5|14612.7|35354.0|1500|639340596000000000
 C|KharToba|4115.2|38891.6|26152.7|[AAA] [BBB]
 ```
@@ -20,7 +20,7 @@ C|KharToba|4115.2|38891.6|26152.7|[AAA] [BBB]
 | Line | Fields | Meaning |
 |---|---|---|
 | `GVKKOTH|1` | version | Header. Ignore messages with another version. |
-| `O` | name, x, y, z, radius (m), bar (0-1), counted participants | An open zone. NPC zones send the grid's current centre. |
+| `O` | name, x, y, z, radius (m), bar (0-1), counted participants, grid entity id | An open zone. NPC zones send the grid's current centre and its entity id (0 for fixed zones); the client follows that grid every frame when it is loaded, for a smooth boundary on moving zones, and uses x/y/z otherwise. |
 | `N` | name, x, y, z, radius (m), start (UTC `DateTime.Ticks`) | The next slot's zone, already picked, not yet open. At most one. |
 | `C` | name, x, y, z, faction tags | A bar completed at this zone (fireworks). |
 

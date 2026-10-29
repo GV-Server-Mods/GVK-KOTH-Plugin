@@ -48,7 +48,8 @@ namespace GVK.Koth.Services
                 sb.Append("O|").Append(Clean(zone.Name)).Append('|').Append(Position(zone.Center)).Append('|')
                   .Append(zone.Profile.Radius.ToString("0", c)).Append('|')
                   .Append(zone.Capture.Fraction.ToString("0.000", c)).Append('|')
-                  .Append(zone.LastParticipantCount.ToString(c)).Append('\n');
+                  .Append(zone.LastParticipantCount.ToString(c)).Append('|')
+                  .Append((zone.Grid?.EntityId ?? 0L).ToString(c)).Append('\n');
             }
 
             var next = zones.NextSlotZone(now);
