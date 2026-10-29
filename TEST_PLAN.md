@@ -23,7 +23,7 @@ No NPC mod changes are needed: NPC zone and linked-block tags can be added in ga
 | 7a | Build your own container named `KOTH Loot` in the zone (unowned or yours), earn a drop | Loot goes only to the NPC-owned `KOTH Loot` container, never yours. With two NPC-owned ones, it goes to the one nearest the centre, never both. |
 | 7 | Rename the container, earn a drop | `!koth status` shows a queued drop; rename it back: the drop arrives within 10 seconds. |
 | 8 | Leave the zone mid-bar | The bar drains (about 3.5 minutes from full). |
-| 9 | Restart Torch mid-bar | `!koth status` shows the bar and queued drops kept. |
+| 9 | Restart Torch mid-bar (zone forced open) | `!koth status` shows the zone still forced open, with its bar and queued drops kept. |
 | 10 | `!koth score`, `!koth points <tag> -3 test` | Standings shown; the change is announced and appears in `Instance\GVK_KOTH\ScoreLog.csv`. |
 | 11 | `!koth stop KharToba`, `!koth auto KharToba` | Zone closes with a chat message, then returns to its schedule. |
 | 12 | Set a slot to start 12 minutes from now, reload | A 10-minute warning appears in chat, then the zone opens at the slot time and closes after its duration. |

@@ -54,6 +54,10 @@ namespace GVK.Koth.Zones
             _announce = announce;
             _npc = new NpcZoneTracker(plugin, data);
             _rules = new RuleEnforcer(announce);
+
+            // Admin overrides survive restarts until !koth auto
+            _forcedOn.UnionWith(data.State.ForcedOn);
+            _forcedOff.UnionWith(data.State.ForcedOff);
         }
 
         private KothConfig Config => _plugin.Config;
@@ -534,18 +538,28 @@ namespace GVK.Koth.Zones
         {
             _forcedOff.Remove(name);
             _forcedOn.Add(name);
+            SaveForced();
         }
 
         public void ForceOff(string name)
         {
             _forcedOn.Remove(name);
             _forcedOff.Add(name);
+            SaveForced();
         }
 
         public void ClearForce(string name)
         {
             _forcedOn.Remove(name);
             _forcedOff.Remove(name);
+            SaveForced();
+        }
+
+        private void SaveForced()
+        {
+            _data.State.ForcedOn = _forcedOn.ToList();
+            _data.State.ForcedOff = _forcedOff.ToList();
+            SaveState();
         }
 
         public string ForceState(string name) =>

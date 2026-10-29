@@ -13,6 +13,10 @@ namespace GVK.Koth.Core
         public List<SlotPick> SlotPicks { get; set; } = new List<SlotPick>();
         public List<NpcZoneSave> NpcZones { get; set; } = new List<NpcZoneSave>();
 
+        /// <summary>Zones forced open or closed with !koth start / !koth stop; kept until !koth auto.</summary>
+        public List<string> ForcedOn { get; set; } = new List<string>();
+        public List<string> ForcedOff { get; set; } = new List<string>();
+
         public NpcZoneSave GetNpcZone(long gridId) => NpcZones.FirstOrDefault(z => z.GridId == gridId);
 
         public ZoneSave GetZone(string name)
