@@ -2,7 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
+using System.Windows;
 using System.Windows.Controls;
+using System.Xml.Serialization;
 using GVK.Koth.Core.Config;
 using GVK.Koth.Services;
 using GVK.Koth.Zones;
@@ -11,7 +14,6 @@ using Torch;
 using Torch.API;
 using Torch.API.Plugins;
 using Torch.API.Session;
-using Torch.Views;
 
 namespace GVK.Koth
 {
@@ -28,13 +30,13 @@ namespace GVK.Koth
         private const double MaxStepSeconds = 5;
 
         private readonly Stopwatch _clock = new Stopwatch();
-        private Persistent<KothConfig> _config;
-        private PropertyGrid _control;
+        private KothConfig _config;
+        private UserControl _control;
         private int _tick;
 
         public static Plugin Instance { get; private set; }
 
-        public KothConfig Config => _config?.Data;
+        public KothConfig Config => _config;
 
         /// <summary>Problems found the last time the config was loaded.</summary>
         public IReadOnlyList<string> ConfigProblems { get; private set; } = Array.Empty<string>();
@@ -143,43 +145,75 @@ namespace GVK.Koth
         }
 
         /// <summary>
-        /// Loads the config (creating a default one), checks it and reports every problem.
+        /// Reads GVK_KOTH.cfg (writing the commented sample there first if it's missing), checks it and reports
+        /// every problem. The plugin only reads the file; it never saves over your edits. If the file can't be read,
+        /// the previous config stays in use.
         /// </summary>
         public void LoadConfig()
         {
             string path = Path.Combine(StoragePath, ConfigFileName);
+            if (!File.Exists(path))
+                WriteDefaultConfig(path);
+
+            KothConfig loaded = null;
             try
             {
-                _config = Persistent<KothConfig>.Load(path);
+                using (var reader = File.OpenRead(path))
+                    loaded = (KothConfig)new XmlSerializer(typeof(KothConfig)).Deserialize(reader);
             }
             catch (Exception ex)
             {
-                Log.Error(ex, $"GVK KOTH: couldn't read {path}; using defaults until it's fixed.");
-                _config = null;
+                Log.Error(ex, $"GVK KOTH: couldn't read {path}.");
+                Alerts.Send($"couldn't read {ConfigFileName} ({ex.GetBaseException().Message}); {(_config == null ? "running with no zones" : "keeping the previous config")}.");
             }
 
-            if (_config?.Data == null)
+            if (loaded != null)
             {
-                _config = new Persistent<KothConfig>(path, new KothConfig());
-                if (!File.Exists(path))
-                    _config.Save();
+                KothConfig.ApplyDefaults(loaded);
+                _config = loaded;
+            }
+            else if (_config == null)
+            {
+                _config = new KothConfig();
+                KothConfig.ApplyDefaults(_config);
             }
 
-            ConfigProblems = ConfigCheck.Run(_config.Data);
+            ConfigProblems = ConfigCheck.Run(_config);
             foreach (string problem in ConfigProblems)
                 Log.Warn("GVK KOTH config: " + problem);
             if (ConfigProblems.Count > 0)
                 Alerts.Send($"config has {ConfigProblems.Count} problem(s):\n- " + string.Join("\n- ", ConfigProblems));
 
             Zones?.Rebuild();
+        }
 
-            if (_control != null)
-                _control.Dispatcher.Invoke(() => _control.DataContext = Config);
+        /// <summary>Writes the commented sample config (embedded from docs/GVK_KOTH.sample.cfg).</summary>
+        private static void WriteDefaultConfig(string path)
+        {
+            try
+            {
+                using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("GVK_KOTH.sample.cfg"))
+                using (var file = File.Create(path))
+                    stream?.CopyTo(file);
+                Log.Info($"GVK KOTH: wrote the sample config to {path}.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, $"GVK KOTH: couldn't write the sample config to {path}.");
+            }
         }
 
         public UserControl GetControl()
         {
-            return _control ??= new PropertyGrid { DataContext = Config };
+            return _control ??= new UserControl
+            {
+                Content = new TextBlock
+                {
+                    Margin = new Thickness(10),
+                    TextWrapping = TextWrapping.Wrap,
+                    Text = $"Edit {ConfigFileName} in the Torch Instance folder, then run !koth reload in game. A settings page is planned."
+                }
+            };
         }
 
         public override void Dispose()

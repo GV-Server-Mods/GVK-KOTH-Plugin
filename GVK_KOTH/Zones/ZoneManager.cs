@@ -20,6 +20,9 @@ namespace GVK.Koth.Zones
     {
         private const double LootRetrySeconds = 10;
         private const double StateSaveSeconds = 60;
+        private const double LootGpsRange = 15000;
+        private static readonly TimeSpan LootGpsLifetime = TimeSpan.FromMinutes(15);
+        private static readonly TimeSpan DefaultOpenGpsLifetime = TimeSpan.FromHours(3);
 
         private readonly Plugin _plugin;
         private readonly KothData _data;
@@ -189,6 +192,7 @@ namespace GVK.Koth.Zones
                 zone.EndedEarly = true;
                 if (zone.Active && profile.Mode != ZoneMode.RulesOnly)
                     _announce.Both($"KOTH {zone.Name} has ended: its control was destroyed.");
+                GpsMarkers.RemoveForAll(GpsMarkers.ZoneName(zone.Name));
                 return false;
             }
 
@@ -288,7 +292,9 @@ namespace GVK.Koth.Zones
             if (delivered > 0)
             {
                 string drops = delivered == 1 ? "Loot has" : $"{delivered} loot drops have";
-                _announce.Chat($"{drops} dropped at {zone.Name}! {LootDelivery.Gps(zone.Name + " Loot", container.GetPosition())}");
+                _announce.Chat($"{drops} dropped at {zone.Name}! Loot GPS added for players nearby.");
+                GpsMarkers.AddForAll(GpsMarkers.LootName(zone.Name), "KOTH loot container", container.GetPosition(),
+                    GpsMarkers.LootColor, LootGpsLifetime, LootGpsRange);
                 SaveState();
             }
         }
@@ -416,8 +422,10 @@ namespace GVK.Koth.Zones
                 if (profile == null)
                     continue;
 
-                string text = $"KOTH {profile.Name} opens in {warning} minutes ({nextStart:HH:mm} UTC). {LootDelivery.Gps("KOTH " + profile.Name, ProfilePosition(profile))}";
-                _announce.Chat(text);
+                _announce.Chat($"KOTH {profile.Name} opens in {warning} minutes ({nextStart:HH:mm} UTC). GPS added.");
+                var closes = nextStart.AddMinutes(slot.DurationMinutes);
+                GpsMarkers.AddForAll(GpsMarkers.ZoneName(profile.Name), $"KOTH opens {nextStart:HH:mm} UTC", ProfilePosition(profile),
+                    GpsMarkers.UpcomingColor, closes - DateTime.UtcNow);
                 string ping = string.IsNullOrWhiteSpace(Config.DiscordSlotWarningPing) ? "" : Config.DiscordSlotWarningPing + " ";
                 _announce.Discord(ping + $"KOTH {profile.Name} opens in {warning} minutes ({nextStart:HH:mm} UTC).");
             }
@@ -436,12 +444,17 @@ namespace GVK.Koth.Zones
                 var slot = Config.Slots.FirstOrDefault(s => _runningSlots.ContainsKey(s.Name)
                     && string.Equals(GetOrPick(s, _runningSlots[s.Name]), zone.Name, StringComparison.OrdinalIgnoreCase));
                 string until = slot != null ? $" until {_runningSlots[slot.Name].AddMinutes(slot.DurationMinutes):HH:mm} UTC" : "";
-                _announce.Chat($"KOTH {zone.Name} is open{until}! {LootDelivery.Gps("KOTH " + zone.Name, zone.Center)}");
+                _announce.Chat($"KOTH {zone.Name} is open{until}! GPS added.");
                 _announce.Discord($"KOTH {zone.Name} is open{until}.");
+                var lifetime = slot != null
+                    ? _runningSlots[slot.Name].AddMinutes(slot.DurationMinutes) - DateTime.UtcNow
+                    : DefaultOpenGpsLifetime;
+                GpsMarkers.AddForAll(GpsMarkers.ZoneName(zone.Name), "King of the Hill: open", zone.Center, GpsMarkers.OpenColor, lifetime);
             }
             else
             {
                 _announce.Both($"KOTH {zone.Name} has closed.");
+                GpsMarkers.RemoveForAll(GpsMarkers.ZoneName(zone.Name));
             }
         }
 
@@ -464,12 +477,17 @@ namespace GVK.Koth.Zones
                     int left = (int)Math.Ceiling((npc.FirstSeenUtc.AddMinutes(zone.Profile.LifetimeMinutes) - DateTime.UtcNow).TotalMinutes);
                     until = $" for {left} minutes";
                 }
-                _announce.Chat($"KOTH {zone.Name} is open{until}! {LootDelivery.Gps("KOTH " + zone.Name, zone.Center)}");
+                _announce.Chat($"KOTH {zone.Name} is open{until}! GPS added.");
                 _announce.Discord($"KOTH {zone.Name} is open{until}.");
+                var lifetime = zone.Profile.Activation == ZoneActivation.Lifetime && zone.Profile.LifetimeMinutes > 0
+                    ? npc.FirstSeenUtc.AddMinutes(zone.Profile.LifetimeMinutes) - DateTime.UtcNow
+                    : DefaultOpenGpsLifetime;
+                GpsMarkers.AddForAll(GpsMarkers.ZoneName(zone.Name), "King of the Hill: open", zone.Center, GpsMarkers.OpenColor, lifetime);
             }
             else if (npc.Ended && !zone.EndedEarly)
             {
                 _announce.Both($"KOTH {zone.Name} has closed.");
+                GpsMarkers.RemoveForAll(GpsMarkers.ZoneName(zone.Name));
             }
         }
 

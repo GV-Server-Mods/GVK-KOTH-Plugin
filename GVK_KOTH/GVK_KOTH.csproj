@@ -65,6 +65,11 @@
     </Reference>
   </ItemGroup>
 
+  <!-- Written as GVK_KOTH.cfg when the server has no config yet -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\docs\GVK_KOTH.sample.cfg" LogicalName="GVK_KOTH.sample.cfg" />
+  </ItemGroup>
+
   <ItemGroup>
     <None Update="manifest.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

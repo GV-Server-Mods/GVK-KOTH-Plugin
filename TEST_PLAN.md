@@ -14,12 +14,13 @@ No NPC mod changes are needed: NPC zone and linked-block tags can be added in ga
 ## Stage 3: fixed zones
 | # | Do | Pass when |
 |---|---|---|
-| 1 | `!koth reload` | Replies "no problems". Break a value (e.g. `Radius` -1), reload: the problem is listed. Fix it. |
-| 2 | `!koth` as a player | Lists KharToba, Kalash, CrashedStarship, Scraptown with next times and GPS. |
-| 3 | `!koth start KharToba`, then `!koth status` | KharToba shows OPEN; chat shows "KOTH KharToba is open!" with a GPS. |
+| 1 | `!koth reload` twice | Both reply "4 zones, 3 slots, no problems", and `GVK_KOTH.cfg` is unchanged on disk (comments and `SlotWarningMinutes` intact). Break a value (e.g. `Radius` -1), reload: the problem is listed. Fix it. |
+| 2 | `!koth list` as a player | Lists KharToba, Kalash, CrashedStarship, Scraptown with next times; open zones get a GPS added to your GPS list. |
+| 3 | `!koth start KharToba`, then `!koth status` | KharToba shows OPEN; chat shows "KOTH KharToba is open! GPS added." and a "KOTH KharToba" GPS appears in the GPS list (terminal GPS tab). `!koth stop KharToba` removes it. |
 | 4 | Fly a powered small grid of 50+ blocks into the zone and sit in its cockpit | `!koth status` shows counted 1 and the bar rising; after about 5 minutes chat says your faction scored 5 points and 1,000,000 SC; faction balance goes up. |
 | 5 | Repeat with a grid under 50 blocks, an unpowered grid, a station, and on foot | Counted stays 0. |
-| 6 | Second faction joins | Bar fills faster (about 4 minutes for two players); both factions score; one loot drop lands in `KOTH Loot` with a chat GPS. |
+| 6 | Second faction joins | Bar fills faster (about 4 minutes for two players); both factions score; one loot drop lands in `KOTH Loot` and a "KOTH KharToba Loot" GPS is added for players within 15 km. |
+| 7a | Build your own container named `KOTH Loot` in the zone (unowned or yours), earn a drop | Loot goes only to the NPC-owned `KOTH Loot` container, never yours. With two NPC-owned ones, it goes to the one nearest the centre, never both. |
 | 7 | Rename the container, earn a drop | `!koth status` shows a queued drop; rename it back: the drop arrives within 10 seconds. |
 | 8 | Leave the zone mid-bar | The bar drains (about 3.5 minutes from full). |
 | 9 | Restart Torch mid-bar | `!koth status` shows the bar and queued drops kept. |
@@ -43,8 +44,8 @@ Setup: add this zone to `GVK_KOTH.cfg`. For each test, spawn a wreck with `/MES.
 
 | # | Do | Pass when |
 |---|---|---|
-| 1 | Tag a wreck and `!koth reload` | The log shows "NPC zone 'TestWreck' found"; chat says "KOTH TestWreck is open for 10 minutes!" with a GPS at the wreck. |
-| 2 | `!koth` and `!koth status` | TestWreck is listed as OPEN while it runs. |
+| 1 | Tag a wreck and `!koth reload` | The log shows "NPC zone 'TestWreck' found"; chat says "KOTH TestWreck is open for 10 minutes! GPS added." and a GPS at the wreck appears in the GPS list. |
+| 2 | `!koth list` and `!koth status` | TestWreck is listed as OPEN while it runs. |
 | 3 | Capture it with a valid grid | Points and SC as for fixed zones. |
 | 4 | Wait out the lifetime | Chat says "KOTH TestWreck has closed"; it doesn't reopen. |
 | 5 | Tag another, then grind or destroy its remote control | Chat says "has ended: its control was destroyed"; the zone ends at once. |

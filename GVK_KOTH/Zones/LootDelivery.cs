@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using GVK.Koth.Core.Config;
 using Sandbox.Game.Entities;
+using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using VRage;
 using VRage.Game;
@@ -17,6 +18,8 @@ namespace GVK.Koth.Zones
     /// </summary>
     public static class LootDelivery
     {
+        private static readonly List<VRage.Game.Entity.MyEntity> Entities = new List<VRage.Game.Entity.MyEntity>();
+
         /// <summary>
         /// Delivers one drop. Returns false (nothing added) if the container is missing, unloaded or too full,
         /// so the drop stays queued.
@@ -55,45 +58,65 @@ namespace GVK.Koth.Zones
             return true;
         }
 
+        /// <summary>
+        /// The one loot container for this zone: named LootContainerName, inside the zone, on a grid an NPC owns
+        /// (majority owner), nearest the zone centre. Player-built containers never qualify, even unowned ones.
+        /// </summary>
         private static IMyCargoContainer FindContainer(ZoneProfile zone, Vector3D center, ref long cachedId)
         {
             double radiusSq = zone.Radius * zone.Radius;
 
             if (cachedId != 0 && MyEntities.TryGetEntityById(cachedId, out var cached)
-                && cached is IMyCargoContainer known && !known.Closed && known.IsFunctional
-                && Vector3D.DistanceSquared(known.GetPosition(), center) <= radiusSq
-                && NameMatches(known, zone))
+                && cached is IMyCargoContainer known && IsValid(known, zone, center, radiusSq))
                 return known;
 
             cachedId = 0;
+            IMyCargoContainer best = null;
+            double bestDistSq = double.MaxValue;
+
+            Entities.Clear();
             var sphere = new BoundingSphereD(center, zone.Radius);
-            foreach (var entity in MyEntities.GetTopMostEntitiesInSphere(ref sphere))
+            MyGamePruningStructure.GetAllTopMostEntitiesInSphere(ref sphere, Entities);
+            foreach (var entity in Entities)
             {
-                if (!(entity is MyCubeGrid grid) || grid.Closed)
+                if (!(entity is MyCubeGrid grid) || grid.Closed || !IsNpcGrid(grid))
                     continue;
 
                 foreach (var block in grid.GetFatBlocks())
                 {
-                    if (block is IMyCargoContainer cargo && cargo.IsFunctional && NameMatches(cargo, zone)
-                        && Vector3D.DistanceSquared(cargo.GetPosition(), center) <= radiusSq)
+                    if (!(block is IMyCargoContainer cargo) || !IsValid(cargo, zone, center, radiusSq))
+                        continue;
+
+                    double distSq = Vector3D.DistanceSquared(cargo.GetPosition(), center);
+                    if (distSq < bestDistSq)
                     {
-                        cachedId = cargo.EntityId;
-                        return cargo;
+                        best = cargo;
+                        bestDistSq = distSq;
                     }
                 }
             }
-            return null;
+            Entities.Clear();
+
+            if (best != null)
+                cachedId = best.EntityId;
+            return best;
+        }
+
+        private static bool IsValid(IMyCargoContainer cargo, ZoneProfile zone, Vector3D center, double radiusSq)
+        {
+            return !cargo.Closed && cargo.IsFunctional && NameMatches(cargo, zone)
+                && cargo.CubeGrid is MyCubeGrid grid && IsNpcGrid(grid)
+                && Vector3D.DistanceSquared(cargo.GetPosition(), center) <= radiusSq;
+        }
+
+        private static bool IsNpcGrid(MyCubeGrid grid)
+        {
+            return grid.BigOwners.Count > 0 && MySession.Static?.Players?.IdentityIsNpc(grid.BigOwners[0]) == true;
         }
 
         private static bool NameMatches(IMyTerminalBlock block, ZoneProfile zone)
         {
             return string.Equals(block.CustomName?.Trim(), zone.LootContainerName?.Trim(), StringComparison.OrdinalIgnoreCase);
-        }
-
-        public static string Gps(string name, Vector3D position)
-        {
-            var c = System.Globalization.CultureInfo.InvariantCulture;
-            return $"GPS:{name}:{position.X.ToString("0.##", c)}:{position.Y.ToString("0.##", c)}:{position.Z.ToString("0.##", c)}:";
         }
     }
 }

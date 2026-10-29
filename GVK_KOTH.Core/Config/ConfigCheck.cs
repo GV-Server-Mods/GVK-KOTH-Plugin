@@ -21,6 +21,9 @@ namespace GVK.Koth.Core.Config
             if (config.UpdateIntervalTicks < 1)
                 problems.Add($"UpdateIntervalTicks is {config.UpdateIntervalTicks}; it must be 1 or more.");
 
+            if (config.Zones == null || config.Zones.Count == 0)
+                problems.Add("No zones are configured, so KOTH does nothing.");
+
             var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var zone in config.Zones ?? new List<ZoneProfile>())
             {
