@@ -1,6 +1,8 @@
 # GVK KOTH test plan
 
-In-game tests on the dev Torch instance (`C:\SE_GVK_S10`). Each stage adds its tests here. Run the rule tests first: `dotnet test GVK_KOTH.Tests`.
+In-game tests on the dev Torch instance (`C:\SE_GVK_S10`, join with direct connect to `localhost`), using the published Workshop mods. A Torch plugin can't run in an offline world. Each stage adds its tests here. Run the rule tests first: `dotnet test GVK_KOTH.Tests`.
+
+No NPC mod changes are needed: NPC zone and linked-block tags can be added in game. With admin "use terminals" on, edit the NPC block's CustomData, then run `!koth reload` (it rescans every grid).
 
 ## Setup
 1. `dotnet build -c Release` (deploys `Plugins\GVK-KOTH.zip`).
@@ -26,7 +28,7 @@ In-game tests on the dev Torch instance (`C:\SE_GVK_S10`). Each stage adds its t
 | 12 | Set a slot to start 12 minutes from now, reload | A 10-minute warning appears in chat, then the zone opens at the slot time and closes after its duration. |
 
 ## Stage 4: NPC zones
-Setup: add a line `GVK-KOTH=TestWreck;` to one wreck's MES behavior profile in GVK_Derelicts (it lands in the remote control's CustomData), build GVK_Derelicts, and add this zone to `GVK_KOTH.cfg`:
+Setup: add this zone to `GVK_KOTH.cfg`. For each test, spawn a wreck with `/MES.Spawn...`, add a line `GVK-KOTH=TestWreck;` to its remote control's CustomData, and run `!koth reload`. (In production the line goes in the MES behavior profile, which MES copies into the remote control's CustomData at spawn.)
 ```xml
 <ZoneProfile>
   <Name>TestWreck</Name>
@@ -41,14 +43,14 @@ Setup: add a line `GVK-KOTH=TestWreck;` to one wreck's MES behavior profile in G
 
 | # | Do | Pass when |
 |---|---|---|
-| 1 | Spawn the wreck with `/MES.Spawn...` | The log shows "NPC zone 'TestWreck' found"; chat says "KOTH TestWreck is open for 10 minutes!" with a GPS at the wreck. |
+| 1 | Tag a wreck and `!koth reload` | The log shows "NPC zone 'TestWreck' found"; chat says "KOTH TestWreck is open for 10 minutes!" with a GPS at the wreck. |
 | 2 | `!koth` and `!koth status` | TestWreck is listed as OPEN while it runs. |
 | 3 | Capture it with a valid grid | Points and SC as for fixed zones. |
 | 4 | Wait out the lifetime | Chat says "KOTH TestWreck has closed"; it doesn't reopen. |
-| 5 | Spawn another, then grind or destroy its remote control | Chat says "has ended: its control was destroyed"; the zone ends at once. |
-| 6 | Spawn another, fly away until the concealment plugin hides it, come back | No new "open" message; the zone is back with its remaining time. |
-| 7 | Spawn another, then `/MES.Clear` (or let it despawn) | The zone disappears quietly. |
-| 8 | Put a tag with an unknown name on a behavior | The admin alerts webhook (or log) reports the unknown profile once. |
+| 5 | Tag another, then grind or destroy its remote control | Chat says "has ended: its control was destroyed"; the zone ends at once. |
+| 6 | Tag another, fly away until the concealment plugin hides it, come back | No new "open" message; the zone is back with its remaining time. |
+| 7 | Tag another, then `/MES.Clear` (or let it despawn) | The zone disappears quietly. |
+| 8 | Tag a wreck with an unknown name and `!koth reload` | The admin alerts webhook (or log) reports the unknown profile once. |
 
 ## Stage 5: KOTH rules and linked blocks
 The old GVK_Settings rule scripts still run until cutover, so test at a spot without old rule beacons, or with a zone set to a new test location.
@@ -60,7 +62,7 @@ The old GVK_Settings rule scripts still run until cutover, so test at a spot wit
 | 3 | Place a safe zone block inside `NoSafeZoneRange`, and a projector inside `NoProjectorRange` | Each switches off; with one range set to 0, that block type is left alone. |
 | 4 | Same with an NPC grid | Nothing changes on NPC grids. |
 | 5 | NPC zone: destroy its remote control | Its rules stop applying at once. |
-| 6 | Add `[GVK-KOTH-Link]` to a store block's CustomData on an NPC grid near a zone, set that zone's `LinkRange`, spawn it | The store is off while the zone is closed and on while it's open (`!koth start` / `!koth stop`). |
+| 6 | Set a zone's `LinkRange`, add `[GVK-KOTH-Link]` to the CustomData of a store block on an NPC grid near it, `!koth reload` | The store is off while the zone is closed and on while it's open (`!koth start` / `!koth stop`). |
 | 7 | Same with `[GVK-KOTH-Link:KharToba]` far from Khar Toba | It follows Khar Toba only, regardless of distance. |
 | 8 | Conceal and reveal the camp | The store comes back in the right state. |
 
