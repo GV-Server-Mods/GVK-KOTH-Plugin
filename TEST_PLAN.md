@@ -24,3 +24,28 @@ In-game tests on the dev Torch instance (`C:\SE_GVK_S10`). Each stage adds its t
 | 10 | `!koth score`, `!koth points <tag> -3 test` | Standings shown; the change is announced and appears in `Instance\GVK_KOTH\ScoreLog.csv`. |
 | 11 | `!koth stop KharToba`, `!koth auto KharToba` | Zone closes with a chat message, then returns to its schedule. |
 | 12 | Set a slot to start 12 minutes from now, reload | A 10-minute warning appears in chat, then the zone opens at the slot time and closes after its duration. |
+
+## Stage 4: NPC zones
+Setup: add a line `GVK-KOTH=TestWreck;` to one wreck's MES behavior profile in GVK_Derelicts (it lands in the remote control's CustomData), build GVK_Derelicts, and add this zone to `GVK_KOTH.cfg`:
+```xml
+<ZoneProfile>
+  <Name>TestWreck</Name>
+  <Attach>NpcTag</Attach>
+  <Activation>Lifetime</Activation>
+  <LifetimeMinutes>10</LifetimeMinutes>
+  <Radius>500</Radius>
+  <CaptureSeconds>60</CaptureSeconds>
+  <PointsPerLoot>0</PointsPerLoot>
+</ZoneProfile>
+```
+
+| # | Do | Pass when |
+|---|---|---|
+| 1 | Spawn the wreck with `/MES.Spawn...` | The log shows "NPC zone 'TestWreck' found"; chat says "KOTH TestWreck is open for 10 minutes!" with a GPS at the wreck. |
+| 2 | `!koth` and `!koth status` | TestWreck is listed as OPEN while it runs. |
+| 3 | Capture it with a valid grid | Points and SC as for fixed zones. |
+| 4 | Wait out the lifetime | Chat says "KOTH TestWreck has closed"; it doesn't reopen. |
+| 5 | Spawn another, then grind or destroy its remote control | Chat says "has ended: its control was destroyed"; the zone ends at once. |
+| 6 | Spawn another, fly away until the concealment plugin hides it, come back | No new "open" message; the zone is back with its remaining time. |
+| 7 | Spawn another, then `/MES.Clear` (or let it despawn) | The zone disappears quietly. |
+| 8 | Put a tag with an unknown name on a behavior | The admin alerts webhook (or log) reports the unknown profile once. |

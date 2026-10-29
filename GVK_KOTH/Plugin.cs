@@ -79,6 +79,7 @@ namespace GVK.Koth
                 Data = new KothData(DataPath);
                 var zones = new ZoneManager(this, Data, Announce);
                 zones.Rebuild();
+                zones.Start();
                 Zones = zones;
                 _clock.Restart();
                 Log.Info($"GVK KOTH started with {Config.Zones.Count} zones and {Config.Slots.Count} slots.");
@@ -94,7 +95,7 @@ namespace GVK.Koth
         {
             try
             {
-                Zones?.SaveState();
+                Zones?.Stop();
             }
             catch (Exception ex)
             {

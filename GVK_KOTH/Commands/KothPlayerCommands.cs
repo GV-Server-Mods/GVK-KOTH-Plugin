@@ -26,8 +26,9 @@ namespace GVK.Koth.Commands
             var now = DateTime.UtcNow;
             var sb = new StringBuilder();
             sb.AppendLine("KOTH zones (!koth score for standings):");
+            // Fixed zones always; NPC zones only while open, since their grids move or come and go.
             foreach (var zone in zones.Zones.Where(z => z.Profile.Enabled && z.Profile.Mode != ZoneMode.RulesOnly
-                                                         && z.Profile.Attach == ZoneAttach.Coordinates))
+                                                         && (!z.IsNpc || z.Active)))
             {
                 sb.AppendLine($"{zone.Name}: {zones.NextRunText(zone, now)}");
                 sb.AppendLine("  " + LootDelivery.Gps("KOTH " + zone.Name, zone.Center));

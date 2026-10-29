@@ -11,6 +11,9 @@ namespace GVK.Koth.Core
     {
         public List<ZoneSave> Zones { get; set; } = new List<ZoneSave>();
         public List<SlotPick> SlotPicks { get; set; } = new List<SlotPick>();
+        public List<NpcZoneSave> NpcZones { get; set; } = new List<NpcZoneSave>();
+
+        public NpcZoneSave GetNpcZone(long gridId) => NpcZones.FirstOrDefault(z => z.GridId == gridId);
 
         public ZoneSave GetZone(string name)
         {
@@ -32,6 +35,33 @@ namespace GVK.Koth.Core
 
         /// <summary>Loot drops earned but not yet delivered (container missing, concealed or full).</summary>
         public int PendingLootDrops { get; set; }
+    }
+
+    /// <summary>
+    /// An NPC grid carrying a KOTH tag. Kept so a concealed (or restarted) grid resumes with its remaining lifetime,
+    /// and a zone that ended stays ended.
+    /// </summary>
+    public sealed class NpcZoneSave
+    {
+        public long GridId { get; set; }
+        public string Profile { get; set; } = "";
+        public DateTime FirstSeenUtc { get; set; }
+        public DateTime LastSeenUtc { get; set; }
+
+        /// <summary>Ended by its lifetime or by its remote control being destroyed; never restarts.</summary>
+        public bool Ended { get; set; }
+
+        /// <summary>"Open" was announced once; a concealed grid coming back doesn't announce again.</summary>
+        public bool AnnouncedOpen { get; set; }
+
+        /// <summary>Key for this grid's ZoneSave (bar and loot), separate from other grids with the same profile.</summary>
+        public string SaveKey => Profile + "#" + GridId;
+
+        /// <summary>True while the zone is within its lifetime (0 minutes = no limit).</summary>
+        public bool WithinLifetime(int lifetimeMinutes, DateTime utcNow)
+        {
+            return !Ended && (lifetimeMinutes <= 0 || utcNow < FirstSeenUtc.AddMinutes(lifetimeMinutes));
+        }
     }
 
     /// <summary>The zone a slot picked for one occurrence, so a restart mid-slot keeps the same zone.</summary>

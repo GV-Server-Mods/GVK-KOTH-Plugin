@@ -136,14 +136,14 @@ namespace GVK.Koth.Commands
         private bool TryZone(string zoneName, out string name)
         {
             name = null;
-            var zone = Plugin?.Zones?.Find(zoneName);
-            if (zone == null)
+            var profile = Plugin?.Config?.Zones.FirstOrDefault(z => string.Equals(z.Name, zoneName, System.StringComparison.OrdinalIgnoreCase));
+            if (profile == null || Plugin.Zones == null)
             {
-                var known = Plugin?.Zones?.Zones.Select(z => z.Name) ?? Enumerable.Empty<string>();
+                var known = Plugin?.Config?.Zones.Select(z => z.Name) ?? Enumerable.Empty<string>();
                 Context.Respond($"No zone '{zoneName}'. Zones: {string.Join(", ", known)}");
                 return false;
             }
-            name = zone.Name;
+            name = profile.Name;
             return true;
         }
     }

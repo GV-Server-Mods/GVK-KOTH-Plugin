@@ -25,7 +25,9 @@ namespace GVK.Koth.Zones
         private readonly Announcer _announce;
         private readonly Random _random = new Random();
 
+        // Fixed-coordinate zones by name; NPC zones live in the tracker, one per tagged grid.
         private readonly Dictionary<string, ZoneRuntime> _zones = new Dictionary<string, ZoneRuntime>(StringComparer.OrdinalIgnoreCase);
+        private readonly NpcZoneTracker _npc;
         private readonly HashSet<string> _forcedOn = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _forcedOff = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -40,13 +42,28 @@ namespace GVK.Koth.Zones
             _plugin = plugin;
             _data = data;
             _announce = announce;
+            _npc = new NpcZoneTracker(plugin, data);
         }
 
         private KothConfig Config => _plugin.Config;
 
-        public IEnumerable<ZoneRuntime> Zones => _zones.Values;
+        /// <summary>Fixed zones and NPC zones.</summary>
+        public IEnumerable<ZoneRuntime> Zones => _zones.Values.Concat(_npc.Zones);
 
+        /// <summary>A fixed zone by name.</summary>
         public ZoneRuntime Find(string name) => name != null && _zones.TryGetValue(name, out var zone) ? zone : null;
+
+        /// <summary>True if the name is a configured zone profile (fixed or NPC).</summary>
+        public bool IsProfile(string name) =>
+            Config.Zones.Any(z => string.Equals(z.Name, name, StringComparison.OrdinalIgnoreCase));
+
+        public void Start() => _npc.Start();
+
+        public void Stop()
+        {
+            SaveState();
+            _npc.Stop();
+        }
 
         /// <summary>Builds the zones from the config, keeping saved bars and loot queues.</summary>
         public void Rebuild()
@@ -57,28 +74,24 @@ namespace GVK.Koth.Zones
 
             foreach (var profile in Config.Zones)
             {
-                if (string.IsNullOrWhiteSpace(profile.Name) || _zones.ContainsKey(profile.Name))
+                if (profile.Attach != ZoneAttach.Coordinates || string.IsNullOrWhiteSpace(profile.Name) || _zones.ContainsKey(profile.Name))
                     continue;
                 _zones[profile.Name] = new ZoneRuntime(profile, _data.State.GetZone(profile.Name));
             }
+
+            _npc.Rebuild();
         }
 
         public void Tick(double dt)
         {
             var now = DateTime.UtcNow;
             var slotZones = UpdateSlots(now);
+            _npc.Refresh(now);
 
-            foreach (var zone in _zones.Values)
+            foreach (var zone in Zones.ToList())
             {
                 var profile = zone.Profile;
-
-                // NPC-attached zones arrive in a later stage.
-                if (profile.Attach != ZoneAttach.Coordinates)
-                    continue;
-
-                bool active = profile.Enabled
-                    && !_forcedOff.Contains(zone.Name)
-                    && (profile.Activation == ZoneActivation.AlwaysOn || slotZones.Contains(zone.Name) || _forcedOn.Contains(zone.Name));
+                bool active = zone.IsNpc ? NpcActive(zone, slotZones, now) : FixedActive(zone, slotZones);
 
                 if (active != zone.Active)
                 {
@@ -86,7 +99,7 @@ namespace GVK.Koth.Zones
                     if (!active)
                         zone.Capture.Reset();
                     if (profile.Activation != ZoneActivation.AlwaysOn && profile.Mode != ZoneMode.RulesOnly)
-                        AnnounceStartOrEnd(zone, slotZones);
+                        AnnounceStartOrEnd(zone);
                 }
 
                 if (zone.Active && profile.Mode != ZoneMode.RulesOnly)
@@ -100,6 +113,48 @@ namespace GVK.Koth.Zones
             _secondsSinceSave += dt;
             if (_secondsSinceSave >= StateSaveSeconds)
                 SaveState();
+        }
+
+        private bool FixedActive(ZoneRuntime zone, HashSet<string> slotZones)
+        {
+            var profile = zone.Profile;
+            return profile.Enabled
+                && !_forcedOff.Contains(zone.Name)
+                && (profile.Activation == ZoneActivation.AlwaysOn || slotZones.Contains(zone.Name) || _forcedOn.Contains(zone.Name));
+        }
+
+        /// <summary>
+        /// An NPC zone runs while its grid is here, its remote control works and (by Activation) its slot is
+        /// running or its lifetime hasn't run out. A destroyed remote control or an expired lifetime ends it for good.
+        /// </summary>
+        private bool NpcActive(ZoneRuntime zone, HashSet<string> slotZones, DateTime now)
+        {
+            var profile = zone.Profile;
+            var npc = zone.Npc;
+            if (npc.Ended || zone.GridGone)
+                return false;
+
+            if (zone.RemoteKilled)
+            {
+                npc.Ended = true;
+                zone.EndedEarly = true;
+                if (zone.Active && profile.Mode != ZoneMode.RulesOnly)
+                    _announce.Both($"KOTH {zone.Name} has ended: its control was destroyed.");
+                return false;
+            }
+
+            if (!profile.Enabled || _forcedOff.Contains(zone.Name))
+                return false;
+
+            if (profile.Activation == ZoneActivation.Slot)
+                return slotZones.Contains(zone.Name) || _forcedOn.Contains(zone.Name);
+
+            if (!npc.WithinLifetime(profile.LifetimeMinutes, now))
+            {
+                npc.Ended = true;
+                return false;
+            }
+            return true;
         }
 
         public void SaveState()
@@ -264,8 +319,14 @@ namespace GVK.Koth.Zones
             }
         }
 
-        private void AnnounceStartOrEnd(ZoneRuntime zone, HashSet<string> slotZones)
+        private void AnnounceStartOrEnd(ZoneRuntime zone)
         {
+            if (zone.IsNpc)
+            {
+                AnnounceNpcStartOrEnd(zone);
+                return;
+            }
+
             if (zone.Active)
             {
                 var slot = Config.Slots.FirstOrDefault(s => _runningSlots.ContainsKey(s.Name)
@@ -275,6 +336,34 @@ namespace GVK.Koth.Zones
                 _announce.Discord($"KOTH {zone.Name} is open{until}.");
             }
             else
+            {
+                _announce.Both($"KOTH {zone.Name} has closed.");
+            }
+        }
+
+        /// <summary>
+        /// NPC zones announce "open" once per grid (not again when revealed from concealment), and "closed" only
+        /// when their lifetime runs out. A grid that despawns or is concealed closes quietly.
+        /// </summary>
+        private void AnnounceNpcStartOrEnd(ZoneRuntime zone)
+        {
+            var npc = zone.Npc;
+            if (zone.Active)
+            {
+                if (npc.AnnouncedOpen)
+                    return;
+                npc.AnnouncedOpen = true;
+
+                string until = "";
+                if (zone.Profile.Activation == ZoneActivation.Lifetime && zone.Profile.LifetimeMinutes > 0)
+                {
+                    int left = (int)Math.Ceiling((npc.FirstSeenUtc.AddMinutes(zone.Profile.LifetimeMinutes) - DateTime.UtcNow).TotalMinutes);
+                    until = $" for {left} minutes";
+                }
+                _announce.Chat($"KOTH {zone.Name} is open{until}! {LootDelivery.Gps("KOTH " + zone.Name, zone.Center)}");
+                _announce.Discord($"KOTH {zone.Name} is open{until}.");
+            }
+            else if (npc.Ended && !zone.EndedEarly)
             {
                 _announce.Both($"KOTH {zone.Name} has closed.");
             }
