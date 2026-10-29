@@ -24,5 +24,8 @@ King of the Hill for the GV: Deserts of Kharak (GVK) Space Engineers server, as 
 - Settings: `Instance\GVK_KOTH.cfg`. Edit it and run `!koth reload`; problems are listed in chat and the log.
 - Scores, the score log (CSV) and saved state: `Instance\GVK_KOTH\`. To start a new season, stop the server and delete that folder.
 
+## For other mods
+Mods can change season points and read which zones are open, and MES can read `GVK_KOTH_<Zone>_Active`: see [docs/API.md](docs/API.md).
+
 ## License
 AGPL-3.0, see `LICENSE.txt`.

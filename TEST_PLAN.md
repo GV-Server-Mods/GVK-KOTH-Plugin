@@ -63,3 +63,12 @@ The old GVK_Settings rule scripts still run until cutover, so test at a spot wit
 | 6 | Add `[GVK-KOTH-Link]` to a store block's CustomData on an NPC grid near a zone, set that zone's `LinkRange`, spawn it | The store is off while the zone is closed and on while it's open (`!koth start` / `!koth stop`). |
 | 7 | Same with `[GVK-KOTH-Link:KharToba]` far from Khar Toba | It follows Khar Toba only, regardless of distance. |
 | 8 | Conceal and reveal the camp | The store comes back in the right state. |
+
+## Stage 6: mod API and MES sandbox booleans
+| # | Do | Pass when |
+|---|---|---|
+| 1 | `!koth start KharToba`, then check an MES condition or `/MES.Debug...` for `GVK_KOTH_KharToba_Active` | It is true while open and false after `!koth stop KharToba`. |
+| 2 | Restart Torch while a zone is open, then stop it | The boolean is false again after the zone closes (no stale true). |
+| 3 | A test mod with the `GvkKothApi` class from `docs/API.md` calls `AddPoints(factionId, 3, "Test", "API test")` | Chat and Discord say "[TAG] gained 3 KOTH points: API test"; `ScoreLog.csv` has a line with source "API: Test". This also confirms mods reach the plugin through mod messages. |
+| 4 | Same with -100 on a faction with fewer points | The total stops at 0. |
+| 5 | The test mod registers `AddZoneListener` and you open and close a zone | The callback fires with the zone name and true, then false. |

@@ -38,6 +38,10 @@ namespace GVK.Koth.Zones
 
         private double _secondsSinceSave;
 
+        // Profiles open at the last check, and profiles whose sandbox boolean has been written at least once.
+        private readonly HashSet<string> _activeProfiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _publishedProfiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         public ZoneManager(Plugin plugin, KothData data, Announcer announce)
         {
             _plugin = plugin;
@@ -113,6 +117,7 @@ namespace GVK.Koth.Zones
             var zones = Zones.ToList();
             _npc.Links.Apply(zones.Where(z => z.Active && z.Profile.Mode != ZoneMode.RulesOnly).ToList());
             _rules.Apply(zones, now);
+            PublishActiveProfiles(zones);
 
             CheckWeeklyRollup(now);
 
@@ -120,6 +125,41 @@ namespace GVK.Koth.Zones
             if (_secondsSinceSave >= StateSaveSeconds)
                 SaveState();
         }
+
+        /// <summary>True while any zone with this profile name is open.</summary>
+        public bool IsProfileActive(string name) => name != null && _activeProfiles.Contains(name);
+
+        /// <summary>
+        /// On every change, sets the MES sandbox boolean GVK_KOTH_&lt;Name&gt;_Active and tells API listeners.
+        /// At start every profile is written once, so a value left true by a crash is corrected.
+        /// </summary>
+        private void PublishActiveProfiles(List<ZoneRuntime> zones)
+        {
+            var nowActive = new HashSet<string>(
+                zones.Where(z => z.Active && z.Profile.Mode != ZoneMode.RulesOnly).Select(z => z.Name),
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (var profile in Config.Zones)
+            {
+                if (profile.Mode == ZoneMode.RulesOnly || string.IsNullOrWhiteSpace(profile.Name))
+                    continue;
+
+                bool active = nowActive.Contains(profile.Name);
+                bool known = _publishedProfiles.Contains(profile.Name);
+                if (known && active == _activeProfiles.Contains(profile.Name))
+                    continue;
+
+                MyAPIGateway.Utilities.SetVariable(SandboxBoolName(profile.Name), active);
+                if (known)
+                    _plugin.Api?.ZoneChanged(profile.Name, active);
+                _publishedProfiles.Add(profile.Name);
+            }
+
+            _activeProfiles.Clear();
+            _activeProfiles.UnionWith(nowActive);
+        }
+
+        public static string SandboxBoolName(string profileName) => $"GVK_KOTH_{profileName}_Active";
 
         private bool FixedActive(ZoneRuntime zone, HashSet<string> slotZones)
         {

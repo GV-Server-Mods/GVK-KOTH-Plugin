@@ -46,6 +46,7 @@ namespace GVK.Koth
         public Announcer Announce { get; private set; }
         public KothData Data { get; private set; }
         public ZoneManager Zones { get; private set; }
+        public ModApi Api { get; private set; }
 
         public bool SessionLoaded => Zones != null;
 
@@ -81,6 +82,8 @@ namespace GVK.Koth
                 zones.Rebuild();
                 zones.Start();
                 Zones = zones;
+                Api = new ModApi(this);
+                Api.Register();
                 _clock.Restart();
                 Log.Info($"GVK KOTH started with {Config.Zones.Count} zones and {Config.Slots.Count} slots.");
             }
@@ -95,6 +98,7 @@ namespace GVK.Koth
         {
             try
             {
+                Api?.Unregister();
                 Zones?.Stop();
             }
             catch (Exception ex)
@@ -102,6 +106,7 @@ namespace GVK.Koth
                 Log.Error(ex, "GVK KOTH: failed to save state on unload.");
             }
 
+            Api = null;
             Zones = null;
             Data?.Dispose();
             Data = null;
