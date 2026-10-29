@@ -72,12 +72,22 @@ namespace GVK.Koth.Zones
 
         private static bool ShouldBeOn(Link link, IReadOnlyList<ZoneRuntime> openZones)
         {
-            if (link.Zone != null)
-                return openZones.Any(z => string.Equals(z.Name, link.Zone, StringComparison.OrdinalIgnoreCase));
-
             var position = link.Block.GetPosition();
-            return openZones.Any(z => z.Profile.LinkRange > 0
-                && Vector3D.DistanceSquared(position, z.Center) <= z.Profile.LinkRange * z.Profile.LinkRange);
+            for (int i = 0; i < openZones.Count; i++)
+            {
+                var zone = openZones[i];
+                if (link.Zone != null)
+                {
+                    if (string.Equals(zone.Name, link.Zone, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+                else if (zone.Profile.LinkRange > 0
+                    && Vector3D.DistanceSquared(position, zone.Center) <= zone.Profile.LinkRange * zone.Profile.LinkRange)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static bool IsNpc(long identityId)

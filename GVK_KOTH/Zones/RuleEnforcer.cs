@@ -22,6 +22,7 @@ namespace GVK.Koth.Zones
 
         private readonly Announcer _announce;
         private readonly Dictionary<string, DateTime> _lastNotice = new Dictionary<string, DateTime>();
+        private readonly List<VRage.Game.Entity.MyEntity> _entities = new List<VRage.Game.Entity.MyEntity>();
 
         public RuleEnforcer(Announcer announce)
         {
@@ -43,11 +44,14 @@ namespace GVK.Koth.Zones
 
                 var center = zone.Center;
                 var sphere = new BoundingSphereD(center, range);
-                foreach (var entity in MyEntities.GetTopMostEntitiesInSphere(ref sphere))
+                _entities.Clear();
+                MyGamePruningStructure.GetAllTopMostEntitiesInSphere(ref sphere, _entities);
+                foreach (var entity in _entities)
                 {
                     if (entity is MyCubeGrid grid && !grid.Closed && grid.Physics != null && !IsNpcGrid(grid))
                         ApplyToGrid(zone, grid, center, now);
                 }
+                _entities.Clear();
             }
         }
 
