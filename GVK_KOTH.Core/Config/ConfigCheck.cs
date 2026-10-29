@@ -80,7 +80,7 @@ namespace GVK.Koth.Core.Config
                     }
                 }
 
-                if (zone.NoThrusterRange < 0 || zone.NoLargeGridPowerRange < 0 || zone.NoSafeZoneRange < 0 || zone.LinkRange < 0)
+                if (zone.NoThrusterRange < 0 || zone.NoLargeGridPowerRange < 0 || zone.NoSafeZoneRange < 0 || zone.NoProjectorRange < 0 || zone.LinkRange < 0)
                     problems.Add($"{label}: rule and link ranges can't be negative.");
             }
 

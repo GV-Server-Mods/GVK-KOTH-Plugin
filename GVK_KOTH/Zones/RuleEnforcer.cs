@@ -36,7 +36,8 @@ namespace GVK.Koth.Zones
                 if (!profile.Enabled || (zone.IsNpc && (zone.Npc.Ended || zone.GridGone)))
                     continue;
 
-                double range = Math.Max(profile.NoThrusterRange, Math.Max(profile.NoLargeGridPowerRange, profile.NoSafeZoneRange));
+                double range = Math.Max(Math.Max(profile.NoThrusterRange, profile.NoLargeGridPowerRange),
+                                        Math.Max(profile.NoSafeZoneRange, profile.NoProjectorRange));
                 if (range <= 0)
                     continue;
 
@@ -56,6 +57,7 @@ namespace GVK.Koth.Zones
             double thrusterSq = profile.NoThrusterRange * profile.NoThrusterRange;
             double powerSq = grid.GridSizeEnum == VRage.Game.MyCubeSize.Large ? profile.NoLargeGridPowerRange * profile.NoLargeGridPowerRange : 0;
             double safeZoneSq = profile.NoSafeZoneRange * profile.NoSafeZoneRange;
+            double projectorSq = profile.NoProjectorRange * profile.NoProjectorRange;
 
             foreach (var block in grid.GetFatBlocks())
             {
@@ -76,10 +78,15 @@ namespace GVK.Koth.Zones
                     rule = "large grid power is";
                     range = profile.NoLargeGridPowerRange;
                 }
-                else if (safeZoneSq > 0 && (functional is IMySafeZoneBlock || functional is IMyProjector) && distSq <= safeZoneSq)
+                else if (safeZoneSq > 0 && functional is IMySafeZoneBlock && distSq <= safeZoneSq)
                 {
-                    rule = "safe zones and projectors are";
+                    rule = "safe zones are";
                     range = profile.NoSafeZoneRange;
+                }
+                else if (projectorSq > 0 && functional is IMyProjector && distSq <= projectorSq)
+                {
+                    rule = "projectors are";
+                    range = profile.NoProjectorRange;
                 }
 
                 if (rule == null)

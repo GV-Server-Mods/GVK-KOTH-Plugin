@@ -57,7 +57,7 @@ The old GVK_Settings rule scripts still run until cutover, so test at a spot wit
 |---|---|---|
 | 1 | Fly a player grid with thrusters inside a zone's `NoThrusterRange` | Its thrusters switch off within a second; you get one chat notice per minute ("thrusters are switched off within 3 km of ..."). Turning them on again switches them off again. |
 | 2 | Bring a large grid inside `NoLargeGridPowerRange` | Its batteries, reactors, solar, wind and hydrogen engines switch off. A small grid is unaffected. |
-| 3 | Place a safe zone block or projector inside `NoSafeZoneRange` | It switches off. |
+| 3 | Place a safe zone block inside `NoSafeZoneRange`, and a projector inside `NoProjectorRange` | Each switches off; with one range set to 0, that block type is left alone. |
 | 4 | Same with an NPC grid | Nothing changes on NPC grids. |
 | 5 | NPC zone: destroy its remote control | Its rules stop applying at once. |
 | 6 | Add `[GVK-KOTH-Link]` to a store block's CustomData on an NPC grid near a zone, set that zone's `LinkRange`, spawn it | The store is off while the zone is closed and on while it's open (`!koth start` / `!koth stop`). |

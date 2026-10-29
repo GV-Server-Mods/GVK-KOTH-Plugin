@@ -92,6 +92,7 @@ namespace GVK.Koth.Core.Config
         public double NoThrusterRange { get; set; }
         public double NoLargeGridPowerRange { get; set; }
         public double NoSafeZoneRange { get; set; }
+        public double NoProjectorRange { get; set; }
 
         /// <summary>NPC blocks tagged [GVK-KOTH-Link] within this range switch on while the zone runs. 0 = off.</summary>
         public double LinkRange { get; set; }
