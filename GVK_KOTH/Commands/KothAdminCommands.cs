@@ -1,4 +1,7 @@
+using System.Globalization;
+using System.Linq;
 using System.Text;
+using Sandbox.ModAPI;
 using Torch.Commands;
 using Torch.Commands.Permissions;
 using VRage.Game.ModAPI;
@@ -35,7 +38,7 @@ namespace GVK.Koth.Commands
             Context.Respond(sb.ToString());
         }
 
-        [Command("status", "Shows GVK KOTH zones and their state.")]
+        [Command("status", "Shows every GVK KOTH zone: open or not, players counted, bar, queued loot.")]
         [Permission(MyPromoteLevel.Admin)]
         public void Status()
         {
@@ -46,12 +49,102 @@ namespace GVK.Koth.Commands
             }
 
             var cfg = Plugin.Config;
+            var zones = Plugin.Zones;
             var sb = new StringBuilder();
-            sb.AppendLine($"GVK KOTH: {(cfg.Enabled ? "enabled" : "DISABLED")}, session {(Plugin.SessionLoaded ? "loaded" : "not loaded")}");
-            sb.AppendLine($"Zones: {cfg.Zones.Count}, slots: {cfg.Slots.Count}, config problems: {Plugin.ConfigProblems.Count}");
-            foreach (var zone in cfg.Zones)
-                sb.AppendLine($"- {zone.Name}: {zone.Mode}, {zone.Attach}, {zone.Activation}{(zone.Enabled ? "" : " (disabled)")}");
+            sb.AppendLine($"GVK KOTH: {(cfg.Enabled ? "enabled" : "DISABLED")}, {(zones != null ? "running" : "session not loaded")}, config problems: {Plugin.ConfigProblems.Count}");
+            if (zones == null)
+            {
+                Context.Respond(sb.ToString());
+                return;
+            }
+
+            foreach (var zone in zones.Zones)
+            {
+                string force = zones.ForceState(zone.Name);
+                sb.AppendLine($"- {zone.Name} ({zone.Profile.Mode}, {zone.Profile.Activation}{(zone.Profile.Enabled ? "" : ", disabled")}{(force == "" ? "" : ", " + force)}): "
+                    + $"{(zone.Active ? "OPEN" : "closed")}, counted {zone.LastParticipantCount}, "
+                    + $"bar {zone.Capture.Fraction:P0}, loot counter {zone.Capture.LootCounter}, queued drops {zone.Save.PendingLootDrops}");
+            }
             Context.Respond(sb.ToString());
+        }
+
+        [Command("start", "Forces a zone open until !koth auto <zone>. Usage: !koth start <zone>")]
+        [Permission(MyPromoteLevel.Admin)]
+        public void Start(string zoneName)
+        {
+            if (!TryZone(zoneName, out string name))
+                return;
+            Plugin.Zones.ForceOn(name);
+            Context.Respond($"{name} forced open. !koth auto {name} returns it to its schedule.");
+        }
+
+        [Command("stop", "Forces a zone closed until !koth auto <zone>. Usage: !koth stop <zone>")]
+        [Permission(MyPromoteLevel.Admin)]
+        public void Stop(string zoneName)
+        {
+            if (!TryZone(zoneName, out string name))
+                return;
+            Plugin.Zones.ForceOff(name);
+            Context.Respond($"{name} forced closed. !koth auto {name} returns it to its schedule.");
+        }
+
+        [Command("auto", "Returns a zone to its normal schedule. Usage: !koth auto <zone>")]
+        [Permission(MyPromoteLevel.Admin)]
+        public void Auto(string zoneName)
+        {
+            if (!TryZone(zoneName, out string name))
+                return;
+            Plugin.Zones.ClearForce(name);
+            Context.Respond($"{name} is back on its schedule.");
+        }
+
+        [Command("points", "Adjusts a faction's season points. Usage: !koth points <faction tag> <+/-amount> <reason>")]
+        [Permission(MyPromoteLevel.Admin)]
+        public void Points(string factionTag, string amount, string reason = "")
+        {
+            if (Plugin?.Data == null)
+            {
+                Context.Respond("GVK KOTH is not running.");
+                return;
+            }
+
+            if (!int.TryParse(amount, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int change) || change == 0)
+            {
+                Context.Respond($"'{amount}' isn't a whole number like 5 or -5.");
+                return;
+            }
+
+            var faction = MyAPIGateway.Session.Factions.TryGetFactionByTag(factionTag);
+            if (faction == null)
+            {
+                Context.Respond($"No faction with tag '{factionTag}'.");
+                return;
+            }
+
+            // Torch splits on spaces; join any extra words back into the reason.
+            string fullReason = string.Join(" ", new[] { reason }.Concat(Context.Args.Skip(3)).Where(s => !string.IsNullOrWhiteSpace(s)));
+            if (string.IsNullOrWhiteSpace(fullReason))
+                fullReason = "Admin adjustment";
+
+            string admin = Context.Player?.DisplayName ?? "Server";
+            var entry = Plugin.Data.AddPoints(faction.FactionId, faction.Tag, faction.Name, change, "Admin",
+                $"{fullReason} (by {admin})");
+            Plugin.Announce.Both($"[{faction.Tag}] {(entry.Change >= 0 ? "gained" : "lost")} {System.Math.Abs(entry.Change)} KOTH points: {fullReason}. Total {entry.NewTotal}.");
+            Context.Respond($"[{faction.Tag}] now has {entry.NewTotal} points.");
+        }
+
+        private bool TryZone(string zoneName, out string name)
+        {
+            name = null;
+            var zone = Plugin?.Zones?.Find(zoneName);
+            if (zone == null)
+            {
+                var known = Plugin?.Zones?.Zones.Select(z => z.Name) ?? Enumerable.Empty<string>();
+                Context.Respond($"No zone '{zoneName}'. Zones: {string.Join(", ", known)}");
+                return false;
+            }
+            name = zone.Name;
+            return true;
         }
     }
 }

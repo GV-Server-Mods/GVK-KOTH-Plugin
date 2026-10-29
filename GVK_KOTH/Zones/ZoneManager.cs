@@ -1,0 +1,364 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Text;
+using GVK.Koth.Core;
+using GVK.Koth.Core.Config;
+using GVK.Koth.Services;
+using Sandbox.ModAPI;
+using VRage.Game.ModAPI;
+
+namespace GVK.Koth.Zones
+{
+    /// <summary>
+    /// Runs every zone once per check: which zones are active (always on, slots, admin overrides), the shared
+    /// capture bars, rewards, the loot queue, slot warnings and the weekly roll-up. Game thread only.
+    /// </summary>
+    public sealed class ZoneManager
+    {
+        private const double LootRetrySeconds = 10;
+        private const double StateSaveSeconds = 60;
+
+        private readonly Plugin _plugin;
+        private readonly KothData _data;
+        private readonly Announcer _announce;
+        private readonly Random _random = new Random();
+
+        private readonly Dictionary<string, ZoneRuntime> _zones = new Dictionary<string, ZoneRuntime>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _forcedOn = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _forcedOff = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Slot name -> start of the occurrence that is running now.
+        private readonly Dictionary<string, DateTime> _runningSlots = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _warningsSent = new HashSet<string>();
+
+        private double _secondsSinceSave;
+
+        public ZoneManager(Plugin plugin, KothData data, Announcer announce)
+        {
+            _plugin = plugin;
+            _data = data;
+            _announce = announce;
+        }
+
+        private KothConfig Config => _plugin.Config;
+
+        public IEnumerable<ZoneRuntime> Zones => _zones.Values;
+
+        public ZoneRuntime Find(string name) => name != null && _zones.TryGetValue(name, out var zone) ? zone : null;
+
+        /// <summary>Builds the zones from the config, keeping saved bars and loot queues.</summary>
+        public void Rebuild()
+        {
+            foreach (var zone in _zones.Values)
+                zone.StoreState();
+            _zones.Clear();
+
+            foreach (var profile in Config.Zones)
+            {
+                if (string.IsNullOrWhiteSpace(profile.Name) || _zones.ContainsKey(profile.Name))
+                    continue;
+                _zones[profile.Name] = new ZoneRuntime(profile, _data.State.GetZone(profile.Name));
+            }
+        }
+
+        public void Tick(double dt)
+        {
+            var now = DateTime.UtcNow;
+            var slotZones = UpdateSlots(now);
+
+            foreach (var zone in _zones.Values)
+            {
+                var profile = zone.Profile;
+
+                // NPC-attached zones arrive in a later stage.
+                if (profile.Attach != ZoneAttach.Coordinates)
+                    continue;
+
+                bool active = profile.Enabled
+                    && !_forcedOff.Contains(zone.Name)
+                    && (profile.Activation == ZoneActivation.AlwaysOn || slotZones.Contains(zone.Name) || _forcedOn.Contains(zone.Name));
+
+                if (active != zone.Active)
+                {
+                    zone.Active = active;
+                    if (!active)
+                        zone.Capture.Reset();
+                    if (profile.Activation != ZoneActivation.AlwaysOn && profile.Mode != ZoneMode.RulesOnly)
+                        AnnounceStartOrEnd(zone, slotZones);
+                }
+
+                if (zone.Active && profile.Mode != ZoneMode.RulesOnly)
+                    RunCapture(zone, dt);
+
+                DeliverQueuedLoot(zone, dt);
+            }
+
+            CheckWeeklyRollup(now);
+
+            _secondsSinceSave += dt;
+            if (_secondsSinceSave >= StateSaveSeconds)
+                SaveState();
+        }
+
+        public void SaveState()
+        {
+            _secondsSinceSave = 0;
+            foreach (var zone in _zones.Values)
+                zone.StoreState();
+            _data.SaveState();
+        }
+
+        // --- Capture ------------------------------------------------------------------------------------------
+
+        private void RunCapture(ZoneRuntime zone, double dt)
+        {
+            var participants = zone.Profile.Mode == ZoneMode.Encampment
+                ? ParticipantScanner.Encampment(zone.Profile, zone.Center)
+                : ParticipantScanner.Capture(zone.Profile, zone.Center);
+
+            zone.LastParticipantCount = participants.Count;
+            var result = zone.Capture.Tick(dt, participants);
+            if (result.Completed)
+                Reward(zone, result);
+        }
+
+        private void Reward(ZoneRuntime zone, CaptureResult result)
+        {
+            var profile = zone.Profile;
+            var tags = new List<string>();
+
+            foreach (long factionId in result.ScoringFactions)
+            {
+                var faction = MyAPIGateway.Session.Factions.TryGetFactionById(factionId);
+                if (faction == null)
+                    continue;
+
+                long credits = (long)result.PointsEach * profile.CreditsPerPoint;
+                if (credits > 0)
+                    faction.RequestChangeBalance(credits);
+
+                if (result.PointsEach > 0)
+                    _data.AddPoints(faction.FactionId, faction.Tag, faction.Name, result.PointsEach,
+                        profile.Mode == ZoneMode.Encampment ? "Encampment" : "Zone", profile.Name);
+
+                tags.Add($"[{faction.Tag}]");
+            }
+
+            if (tags.Count > 0)
+            {
+                string credits = profile.CreditsPerPoint > 0
+                    ? $" and {((long)result.PointsEach * profile.CreditsPerPoint).ToString("N0", CultureInfo.InvariantCulture)} SC"
+                    : "";
+                _announce.Both($"{profile.Name}: {string.Join(" ", tags)} scored {result.PointsEach} points{credits} each.");
+            }
+
+            if (result.LootDrops > 0)
+            {
+                zone.Save.PendingLootDrops += result.LootDrops;
+                zone.SecondsToNextLootAttempt = 0;
+            }
+        }
+
+        private void DeliverQueuedLoot(ZoneRuntime zone, double dt)
+        {
+            if (zone.Save.PendingLootDrops <= 0)
+                return;
+
+            zone.SecondsToNextLootAttempt -= dt;
+            if (zone.SecondsToNextLootAttempt > 0)
+                return;
+            zone.SecondsToNextLootAttempt = LootRetrySeconds;
+
+            int delivered = 0;
+            IMyCargoContainer container = null;
+            while (zone.Save.PendingLootDrops > 0
+                && LootDelivery.TryDeliver(zone.Profile, zone.Center, ref zone.LootContainerId, out container))
+            {
+                zone.Save.PendingLootDrops--;
+                delivered++;
+            }
+
+            if (delivered > 0)
+            {
+                string drops = delivered == 1 ? "Loot has" : $"{delivered} loot drops have";
+                _announce.Chat($"{drops} dropped at {zone.Name}! {LootDelivery.Gps(zone.Name + " Loot", container.GetPosition())}");
+                SaveState();
+            }
+        }
+
+        // --- Slots ----------------------------------------------------------------------------------------------
+
+        /// <summary>Returns the zones picked by running slots, and handles slot start, end and warnings.</summary>
+        private HashSet<string> UpdateSlots(DateTime now)
+        {
+            var picked = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var slot in Config.Slots)
+            {
+                if (!slot.Enabled || slot.Pool == null || slot.Pool.Count == 0 || slot.DurationMinutes <= 0)
+                    continue;
+
+                if (WeeklySchedule.IsActive(slot.Start, slot.DurationMinutes, now, out var start))
+                {
+                    string zone = GetOrPick(slot, start);
+                    if (zone != null)
+                        picked.Add(zone);
+                    _runningSlots[slot.Name] = start;
+                }
+                else
+                {
+                    _runningSlots.Remove(slot.Name);
+                    SendWarnings(slot, WeeklySchedule.NextStart(slot.Start, now), now);
+                }
+            }
+
+            // Forget picks older than a week.
+            _data.State.SlotPicks.RemoveAll(p => p.StartUtc < now.AddDays(-8));
+            return picked;
+        }
+
+        /// <summary>The zone a slot occurrence uses, picked at random once and saved.</summary>
+        private string GetOrPick(SlotConfig slot, DateTime start)
+        {
+            var pick = _data.State.SlotPicks.FirstOrDefault(p =>
+                string.Equals(p.Slot, slot.Name, StringComparison.OrdinalIgnoreCase) && p.StartUtc == start);
+            if (pick != null)
+                return pick.Zone;
+
+            var pool = slot.Pool.Where(name => Find(name)?.Profile.Enabled == true).ToList();
+            if (pool.Count == 0)
+            {
+                _plugin.Alerts.Send($"Slot '{slot.Name}' has no enabled zones to pick from.");
+                return null;
+            }
+
+            string zone = pool[_random.Next(pool.Count)];
+            _data.State.SlotPicks.Add(new SlotPick { Slot = slot.Name, StartUtc = start, Zone = zone });
+            _data.SaveState();
+            return zone;
+        }
+
+        private void SendWarnings(SlotConfig slot, DateTime nextStart, DateTime now)
+        {
+            double minutesUntil = (nextStart - now).TotalMinutes;
+            foreach (int warning in Config.SlotWarningMinutes ?? new List<int>())
+            {
+                if (warning <= 0 || minutesUntil > warning || minutesUntil <= warning - 2)
+                    continue;
+
+                string key = $"{slot.Name}|{nextStart:o}|{warning}";
+                if (!_warningsSent.Add(key))
+                    continue;
+
+                string zoneName = GetOrPick(slot, nextStart);
+                var zone = Find(zoneName);
+                if (zone == null)
+                    continue;
+
+                string text = $"KOTH {zone.Name} opens in {warning} minutes ({nextStart:HH:mm} UTC). {LootDelivery.Gps("KOTH " + zone.Name, zone.Center)}";
+                _announce.Chat(text);
+                string ping = string.IsNullOrWhiteSpace(Config.DiscordSlotWarningPing) ? "" : Config.DiscordSlotWarningPing + " ";
+                _announce.Discord(ping + $"KOTH {zone.Name} opens in {warning} minutes ({nextStart:HH:mm} UTC).");
+            }
+        }
+
+        private void AnnounceStartOrEnd(ZoneRuntime zone, HashSet<string> slotZones)
+        {
+            if (zone.Active)
+            {
+                var slot = Config.Slots.FirstOrDefault(s => _runningSlots.ContainsKey(s.Name)
+                    && string.Equals(GetOrPick(s, _runningSlots[s.Name]), zone.Name, StringComparison.OrdinalIgnoreCase));
+                string until = slot != null ? $" until {_runningSlots[slot.Name].AddMinutes(slot.DurationMinutes):HH:mm} UTC" : "";
+                _announce.Chat($"KOTH {zone.Name} is open{until}! {LootDelivery.Gps("KOTH " + zone.Name, zone.Center)}");
+                _announce.Discord($"KOTH {zone.Name} is open{until}.");
+            }
+            else
+            {
+                _announce.Both($"KOTH {zone.Name} has closed.");
+            }
+        }
+
+        // --- Weekly roll-up --------------------------------------------------------------------------------------
+
+        private void CheckWeeklyRollup(DateTime now)
+        {
+            var scores = _data.Scores;
+            var due = WeeklySchedule.LastStart(Config.WeeklyRollup, now);
+            if (scores.Data.LastRollupUtc >= due)
+                return;
+
+            // First run: start counting from now instead of posting an empty roll-up.
+            if (scores.Data.LastRollupUtc != default)
+                _announce.Discord(StandingsText("Weekly KOTH roll-up", includeGain: true));
+
+            scores.MarkRollup(now);
+            _data.SaveScores();
+        }
+
+        public string StandingsText(string title, bool includeGain)
+        {
+            var standings = _data.Scores.Standings();
+            var sb = new StringBuilder();
+            sb.AppendLine($"**{title}**");
+            if (standings.Count == 0)
+            {
+                sb.AppendLine("No KOTH points yet this season.");
+                return sb.ToString();
+            }
+
+            int rank = 1;
+            foreach (var (score, gain) in standings)
+            {
+                string gainText = includeGain ? $" (+{gain} this week)" : "";
+                sb.AppendLine($"{rank++}. [{score.Tag}] {score.Name}: {score.Points}{gainText}");
+            }
+            return sb.ToString();
+        }
+
+        // --- Admin overrides -------------------------------------------------------------------------------------
+
+        public void ForceOn(string name)
+        {
+            _forcedOff.Remove(name);
+            _forcedOn.Add(name);
+        }
+
+        public void ForceOff(string name)
+        {
+            _forcedOn.Remove(name);
+            _forcedOff.Add(name);
+        }
+
+        public void ClearForce(string name)
+        {
+            _forcedOn.Remove(name);
+            _forcedOff.Remove(name);
+        }
+
+        public string ForceState(string name) =>
+            _forcedOn.Contains(name) ? "forced on" : _forcedOff.Contains(name) ? "forced off" : "";
+
+        /// <summary>When the zone next runs, for !koth.</summary>
+        public string NextRunText(ZoneRuntime zone, DateTime now)
+        {
+            if (zone.Active)
+                return "OPEN now";
+            if (zone.Profile.Activation == ZoneActivation.AlwaysOn)
+                return "always on";
+
+            var times = Config.Slots
+                .Where(s => s.Enabled && s.Pool.Any(p => string.Equals(p, zone.Name, StringComparison.OrdinalIgnoreCase)))
+                .Select(s => (Slot: s, Next: WeeklySchedule.NextStart(s.Start, now)))
+                .OrderBy(x => x.Next)
+                .ToList();
+            if (times.Count == 0)
+                return "not scheduled";
+
+            var first = times[0];
+            string chance = first.Slot.Pool.Count > 1 ? $" (1 of {first.Slot.Pool.Count} picked at random)" : "";
+            return $"next possible {first.Next:ddd HH:mm} UTC{chance}";
+        }
+    }
+}

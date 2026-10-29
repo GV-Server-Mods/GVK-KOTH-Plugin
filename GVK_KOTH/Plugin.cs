@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Windows.Controls;
 using GVK.Koth.Core.Config;
+using GVK.Koth.Services;
+using GVK.Koth.Zones;
 using NLog;
 using Torch;
 using Torch.API;
@@ -21,6 +24,10 @@ namespace GVK.Koth
 
         private const string ConfigFileName = "GVK_KOTH.cfg";
 
+        // Longest gap counted between checks, so a hitch or a paused server doesn't jump a bar forward.
+        private const double MaxStepSeconds = 5;
+
+        private readonly Stopwatch _clock = new Stopwatch();
         private Persistent<KothConfig> _config;
         private PropertyGrid _control;
         private int _tick;
@@ -35,14 +42,20 @@ namespace GVK.Koth
         /// <summary>Folder for scores, the score log and saved state. Delete it (server stopped) for a new season.</summary>
         public string DataPath => Path.Combine(StoragePath, "GVK_KOTH");
 
-        public bool SessionLoaded { get; private set; }
+        public AdminAlerts Alerts { get; private set; }
+        public Announcer Announce { get; private set; }
+        public KothData Data { get; private set; }
+        public ZoneManager Zones { get; private set; }
+
+        public bool SessionLoaded => Zones != null;
 
         public override void Init(ITorchBase torch)
         {
             base.Init(torch);
             Instance = this;
 
-            Directory.CreateDirectory(DataPath);
+            Alerts = new AdminAlerts(this);
+            Announce = new Announcer(this);
             LoadConfig();
 
             if (Torch.Managers.GetManager(typeof(ITorchSessionManager)) is ITorchSessionManager sessionManager)
@@ -54,28 +67,71 @@ namespace GVK.Koth
         private void OnSessionStateChanged(ITorchSession session, TorchSessionState newState)
         {
             if (newState == TorchSessionState.Loaded)
-            {
-                SessionLoaded = true;
-                Log.Info("GVK KOTH: session loaded.");
-            }
+                StartSession();
             else if (newState == TorchSessionState.Unloading)
+                StopSession();
+        }
+
+        private void StartSession()
+        {
+            try
             {
-                SessionLoaded = false;
+                Data = new KothData(DataPath);
+                var zones = new ZoneManager(this, Data, Announce);
+                zones.Rebuild();
+                Zones = zones;
+                _clock.Restart();
+                Log.Info($"GVK KOTH started with {Config.Zones.Count} zones and {Config.Slots.Count} slots.");
             }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "GVK KOTH failed to start.");
+                Alerts.Send("Failed to start; see the Torch log.");
+            }
+        }
+
+        private void StopSession()
+        {
+            try
+            {
+                Zones?.SaveState();
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "GVK KOTH: failed to save state on unload.");
+            }
+
+            Zones = null;
+            Data?.Dispose();
+            Data = null;
         }
 
         public override void Update()
         {
-            if (!SessionLoaded || Config == null || !Config.Enabled)
+            var zones = Zones;
+            if (zones == null || Config == null || !Config.Enabled)
                 return;
 
             if (++_tick < Math.Max(1, Config.UpdateIntervalTicks))
                 return;
             _tick = 0;
+
+            // Real elapsed time, so capture times hold even when sim speed drops.
+            double dt = Math.Min(_clock.Elapsed.TotalSeconds, MaxStepSeconds);
+            _clock.Restart();
+
+            try
+            {
+                zones.Tick(dt);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "GVK KOTH: zone update failed.");
+            }
         }
 
         /// <summary>
-        /// Loads the config (creating a default one), checks it and logs every problem.
+        /// Loads the config (creating a default one), checks it and reports every problem.
         /// </summary>
         public void LoadConfig()
         {
@@ -100,6 +156,10 @@ namespace GVK.Koth
             ConfigProblems = ConfigCheck.Run(_config.Data);
             foreach (string problem in ConfigProblems)
                 Log.Warn("GVK KOTH config: " + problem);
+            if (ConfigProblems.Count > 0)
+                Alerts.Send($"config has {ConfigProblems.Count} problem(s):\n- " + string.Join("\n- ", ConfigProblems));
+
+            Zones?.Rebuild();
 
             if (_control != null)
                 _control.Dispatcher.Invoke(() => _control.DataContext = Config);
@@ -115,7 +175,7 @@ namespace GVK.Koth
             if (Torch?.Managers?.GetManager(typeof(ITorchSessionManager)) is ITorchSessionManager sessionManager)
                 sessionManager.SessionStateChanged -= OnSessionStateChanged;
 
-            SessionLoaded = false;
+            StopSession();
             Instance = null;
             base.Dispose();
         }
