@@ -29,6 +29,29 @@ namespace GVK.Koth.Tests
         }
     }
 
+    public class LinkTagTests
+    {
+        [Theory]
+        [InlineData("[GVK-KOTH-Link]", null)]
+        [InlineData("[GVK-KOTH-Link:KharToba]", "KharToba")]
+        [InlineData("Shop\n[gvk-koth-link : Kalash ]\n", "Kalash")]
+        [InlineData("[GVK-KOTH-Link:]", null)]
+        public void Reads_link_tags(string customData, string expectedZone)
+        {
+            Assert.True(NpcTag.ReadLink(customData, out string zone));
+            Assert.Equal(expectedZone, zone);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("GVK-KOTH=Wreck;")]
+        [InlineData("GVK-KOTH-Link")]
+        public void Ignores_non_link_data(string customData)
+        {
+            Assert.False(NpcTag.ReadLink(customData, out _));
+        }
+    }
+
     public class NpcLifetimeTests
     {
         private static readonly DateTime Spawn = new DateTime(2026, 10, 28, 12, 0, 0, DateTimeKind.Utc);

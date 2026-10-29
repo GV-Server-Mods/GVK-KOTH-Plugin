@@ -49,3 +49,17 @@ Setup: add a line `GVK-KOTH=TestWreck;` to one wreck's MES behavior profile in G
 | 6 | Spawn another, fly away until the concealment plugin hides it, come back | No new "open" message; the zone is back with its remaining time. |
 | 7 | Spawn another, then `/MES.Clear` (or let it despawn) | The zone disappears quietly. |
 | 8 | Put a tag with an unknown name on a behavior | The admin alerts webhook (or log) reports the unknown profile once. |
+
+## Stage 5: KOTH rules and linked blocks
+The old GVK_Settings rule scripts still run until cutover, so test at a spot without old rule beacons, or with a zone set to a new test location.
+
+| # | Do | Pass when |
+|---|---|---|
+| 1 | Fly a player grid with thrusters inside a zone's `NoThrusterRange` | Its thrusters switch off within a second; you get one chat notice per minute ("thrusters are switched off within 3 km of ..."). Turning them on again switches them off again. |
+| 2 | Bring a large grid inside `NoLargeGridPowerRange` | Its batteries, reactors, solar, wind and hydrogen engines switch off. A small grid is unaffected. |
+| 3 | Place a safe zone block or projector inside `NoSafeZoneRange` | It switches off. |
+| 4 | Same with an NPC grid | Nothing changes on NPC grids. |
+| 5 | NPC zone: destroy its remote control | Its rules stop applying at once. |
+| 6 | Add `[GVK-KOTH-Link]` to a store block's CustomData on an NPC grid near a zone, set that zone's `LinkRange`, spawn it | The store is off while the zone is closed and on while it's open (`!koth start` / `!koth stop`). |
+| 7 | Same with `[GVK-KOTH-Link:KharToba]` far from Khar Toba | It follows Khar Toba only, regardless of distance. |
+| 8 | Conceal and reveal the camp | The store comes back in the right state. |

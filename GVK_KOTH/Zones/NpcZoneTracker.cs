@@ -40,6 +40,9 @@ namespace GVK.Koth.Zones
 
         public IEnumerable<ZoneRuntime> Zones => _zones.Values;
 
+        /// <summary>Tagged NPC blocks found by the same grid scan.</summary>
+        public LinkedBlocks Links { get; } = new LinkedBlocks();
+
         public void Start()
         {
             MyEntities.OnEntityAdd += OnEntityAdd;
@@ -66,6 +69,7 @@ namespace GVK.Koth.Zones
                 zone.StoreState();
             _zones.Clear();
             _unknownProfileReported.Clear();
+            Links.Clear();
 
             var now = DateTime.UtcNow;
             foreach (var entity in MyEntities.GetEntities())
@@ -123,9 +127,11 @@ namespace GVK.Koth.Zones
 
         private void Check(long gridId, DateTime now)
         {
-            if (_zones.ContainsKey(gridId))
-                return;
             if (!MyEntities.TryGetEntityById(gridId, out var entity) || !(entity is MyCubeGrid grid) || grid.Closed || grid.MarkedForClose)
+                return;
+
+            Links.Scan(grid);
+            if (_zones.ContainsKey(gridId))
                 return;
 
             foreach (var block in grid.GetFatBlocks())

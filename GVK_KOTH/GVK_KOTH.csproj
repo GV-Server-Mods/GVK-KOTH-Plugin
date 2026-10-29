@@ -39,6 +39,10 @@
       <HintPath>$(TorchDir)\DedicatedServer64\Sandbox.Common.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="SpaceEngineers.Game">
+      <HintPath>$(TorchDir)\DedicatedServer64\SpaceEngineers.Game.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="VRage">
       <HintPath>$(TorchDir)\DedicatedServer64\VRage.dll</HintPath>
       <Private>False</Private>

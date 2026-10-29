@@ -28,6 +28,7 @@ namespace GVK.Koth.Zones
         // Fixed-coordinate zones by name; NPC zones live in the tracker, one per tagged grid.
         private readonly Dictionary<string, ZoneRuntime> _zones = new Dictionary<string, ZoneRuntime>(StringComparer.OrdinalIgnoreCase);
         private readonly NpcZoneTracker _npc;
+        private readonly RuleEnforcer _rules;
         private readonly HashSet<string> _forcedOn = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _forcedOff = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -43,6 +44,7 @@ namespace GVK.Koth.Zones
             _data = data;
             _announce = announce;
             _npc = new NpcZoneTracker(plugin, data);
+            _rules = new RuleEnforcer(announce);
         }
 
         private KothConfig Config => _plugin.Config;
@@ -107,6 +109,10 @@ namespace GVK.Koth.Zones
 
                 DeliverQueuedLoot(zone, dt);
             }
+
+            var zones = Zones.ToList();
+            _npc.Links.Apply(zones.Where(z => z.Active && z.Profile.Mode != ZoneMode.RulesOnly).ToList());
+            _rules.Apply(zones, now);
 
             CheckWeeklyRollup(now);
 
