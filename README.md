@@ -17,7 +17,6 @@ King of the Hill for the GV: Deserts of Kharak (GVK) Space Engineers server, as 
 |---|---|---|---|
 | `KharToba`, `Kalash`, `CrashedStarship` | Fixed coordinates | Weekly slots, one picked at random from the pool | Capture; Kalash and Crashed Starship small grids only |
 | `Scraptown` | Fixed coordinates | Always | Capture, large grids |
-| `KOTHCamp` | Follows the NPC grid tagged `GVK-KOTH=KOTHCamp;` in its MES behavior | While the camp exists | Encampment: powered large-grid stations of 100+ blocks within 500 m |
 | `KOTHTown` | Fixed coordinates of the NST KOTH Town | Always, but switched off in the sample until the town's spawn group is re-enabled in GVK_Derelicts | Encampment, 3,000 m |
 
 ## Projects

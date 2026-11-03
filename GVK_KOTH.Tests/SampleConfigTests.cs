@@ -26,33 +26,19 @@ namespace GVK.Koth.Tests
                 config = (KothConfig)new XmlSerializer(typeof(KothConfig)).Deserialize(reader);
 
             KothConfig.ApplyDefaults(config);
-            Assert.Equal(6, config.Zones.Count);
+            Assert.Equal(5, config.Zones.Count);
             Assert.Equal(3, config.Slots.Count);
             Assert.Equal(new[] { 30, 10 }, config.SlotWarningMinutes);
             Assert.Empty(ConfigCheck.Run(config));
         }
 
         [Fact]
-        public void Sample_has_the_camp_and_town_profiles_the_prefabs_expect()
+        public void Sample_has_the_town_profile_the_prefab_expects()
         {
             KothConfig config;
             using (var reader = File.OpenRead(FindSample()))
                 config = (KothConfig)new XmlSerializer(typeof(KothConfig)).Deserialize(reader);
             KothConfig.ApplyDefaults(config);
-
-            // The camp is tagged by "GVK-KOTH=KOTHCamp;" in its MES behavior and follows the grid.
-            var camp = config.Zones.Single(z => z.Name == "KOTHCamp");
-            Assert.True(camp.Enabled);
-            Assert.Equal(ZoneAttach.NpcTag, camp.Attach);
-            Assert.Equal(ZoneMode.Encampment, camp.Mode);
-            Assert.Equal(ZoneActivation.AlwaysOn, camp.Activation);
-            Assert.Equal(0, camp.LifetimeMinutes);
-            Assert.Equal(500, camp.Radius);
-            Assert.Equal(3600, camp.CaptureSeconds);
-            Assert.Equal(1000000, camp.CreditsPerPoint);
-            Assert.False(camp.SmallGrids);
-            Assert.Equal(0, camp.PointsPerLoot);
-            Assert.Equal("KOTHCamp", NpcTag.Read("GVK-KOTH=KOTHCamp;"));
 
             // The town spawn group is commented out in GVK_Derelicts, so its profile ships switched off.
             var town = config.Zones.Single(z => z.Name == "KOTHTown");
@@ -62,8 +48,8 @@ namespace GVK.Koth.Tests
             Assert.Equal(3000, town.Radius);
             Assert.Equal(12, town.PointsPerLoot);
 
-            // Neither is in a slot pool.
-            Assert.DoesNotContain(config.Slots.SelectMany(s => s.Pool), p => p == "KOTHCamp" || p == "KOTHTown");
+            // The town is not in a slot pool.
+            Assert.DoesNotContain(config.Slots.SelectMany(s => s.Pool), p => p == "KOTHTown");
         }
 
         [Fact]

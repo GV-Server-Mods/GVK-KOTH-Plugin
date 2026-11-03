@@ -10,7 +10,7 @@ using VRageMath;
 namespace GVK.Koth.Zones
 {
     /// <summary>
-    /// NPC blocks tagged "[GVK-KOTH-Link]" or "[GVK-KOTH-Link:Zone]" in CustomData (e.g. KOTH Camp stores and
+    /// NPC blocks tagged "[GVK-KOTH-Link]" or "[GVK-KOTH-Link:Zone]" in CustomData (e.g. KOTH trade station stores and
     /// medical rooms) switch on while their KOTH is open and off otherwise. Game thread only.
     /// </summary>
     public sealed class LinkedBlocks

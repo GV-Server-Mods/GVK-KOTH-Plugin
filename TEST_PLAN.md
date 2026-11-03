@@ -9,12 +9,12 @@ No NPC mod changes are needed: NPC zone and linked-block tags can be added in ga
 2. Remove `Plugins\SenX-KOTH-Plugin.zip` and `Plugins\Koth-Plugin.zip` from the test instance, so only one KOTH plugin runs.
 3. Copy `docs\GVK_KOTH.sample.cfg` to `Instance\GVK_KOTH.cfg`.
 4. At one site, name a cargo container on the KOTH structure `KOTH Loot`.
-5. Start Torch. The log should show `GVK KOTH started with 6 zones and 3 slots.` (the sample has KOTHCamp and KOTHTown too; KOTHTown is switched off) and no config warnings.
+5. Start Torch. The log should show `GVK KOTH started with 5 zones and 3 slots.` (the sample has KOTHTown too; KOTHTown is switched off) and no config warnings.
 
 ## Stage 3: fixed zones
 | # | Do | Pass when |
 |---|---|---|
-| 1 | `!koth reload` twice | Both reply "6 zones, 3 slots, no problems", and `GVK_KOTH.cfg` is unchanged on disk (comments and `SlotWarningMinutes` intact). Break a value (e.g. `Radius` -1), reload: the problem is listed. Fix it. |
+| 1 | `!koth reload` twice | Both reply "5 zones, 3 slots, no problems", and `GVK_KOTH.cfg` is unchanged on disk (comments and `SlotWarningMinutes` intact). Break a value (e.g. `Radius` -1), reload: the problem is listed. Fix it. |
 | 2 | `!koth list` as a player | Lists KharToba, Kalash, CrashedStarship, Scraptown with next times; open zones get a GPS added to your GPS list. |
 | 3 | `!koth start KharToba`, then `!koth status` | KharToba shows OPEN; chat shows "KOTH KharToba is open! GPS added." and a "KOTH KharToba" GPS appears in the GPS list (terminal GPS tab). `!koth stop KharToba` removes it. |
 | 4 | Fly a powered small grid of 50+ blocks into the zone and sit in its cockpit | `!koth status` shows counted 1 and the bar rising; after about 5 minutes chat says your faction scored 5 points and 1,000,000 SC; faction balance goes up. |
@@ -52,9 +52,7 @@ Setup: add this zone to `GVK_KOTH.cfg`. For each test, spawn a wreck with `/MES.
 | 6 | Tag another, fly away until the concealment plugin hides it, come back | No new "open" message; the zone is back with its remaining time. |
 | 7 | Tag another, then `/MES.Clear` (or let it despawn) | The zone disappears quietly. |
 | 8 | Tag a wreck with an unknown name and `!koth reload` | The admin alerts webhook (or log) reports the unknown profile once. |
-| 9 | KOTH Camp: spawn `GVK-Other-KOTH-SpawnGroup-Camp` (needs `GVK-KOTH=KOTHCamp;` in `GVK-Other-KOTH-Behavior-Camp`, or add the line to the remote control by hand), `!koth reload`, `!koth status` | KOTHCamp is OPEN with the zone centred on the camp (500 m), with no open/close chat message (AlwaysOn). A powered large-grid station of 100+ blocks inside 500 m is counted; a small grid and a player on foot are not. |
-| 10 | Let the camp's bar fill (or set `CaptureSeconds` low for the test) | Chat says the faction scored its points and 1,000,000 SC per point; no loot is dropped (`PointsPerLoot` 0). Despawn the camp (`/MES.Clear`): the zone disappears quietly. |
-| 11 | KOTH Town (only if its spawn group is re-enabled in GVK_Derelicts): set `Enabled` true, `!koth reload` | KOTHTown is OPEN at the town's coordinates (3,000 m). Left off in the sample, `!koth list` doesn't show it. |
+| 9 | KOTH Town (only if its spawn group is re-enabled in GVK_Derelicts): set `Enabled` true, `!koth reload` | KOTHTown is OPEN at the town's coordinates (3,000 m). Left off in the sample, `!koth list` doesn't show it. |
 
 ## Stage 5: KOTH rules and linked blocks
 The old GVK_Settings rule scripts still run until cutover, so test at a spot without old rule beacons, or with a zone set to a new test location.
@@ -68,7 +66,7 @@ The old GVK_Settings rule scripts still run until cutover, so test at a spot wit
 | 5 | NPC zone: destroy its remote control | Its rules stop applying at once. |
 | 6 | Set a zone's `LinkRange`, add `[GVK-KOTH-Link]` to the CustomData of a store block on an NPC grid near it, `!koth reload` | The store is off while the zone is closed and on while it's open (`!koth start` / `!koth stop`). |
 | 7 | Same with `[GVK-KOTH-Link:KharToba]` far from Khar Toba | It follows Khar Toba only, regardless of distance. |
-| 8 | Conceal and reveal the camp | The store comes back in the right state. |
+| 8 | Conceal and reveal the trade station | The store comes back in the right state. |
 
 ## Stage 6: mod API and MES sandbox booleans
 | # | Do | Pass when |
