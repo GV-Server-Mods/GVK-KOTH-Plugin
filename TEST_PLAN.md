@@ -9,12 +9,12 @@ No NPC mod changes are needed: NPC zone and linked-block tags can be added in ga
 2. Remove `Plugins\SenX-KOTH-Plugin.zip` and `Plugins\Koth-Plugin.zip` from the test instance, so only one KOTH plugin runs.
 3. Copy `docs\GVK_KOTH.sample.cfg` to `Instance\GVK_KOTH.cfg`.
 4. At one site, name a cargo container on the KOTH structure `KOTH Loot`.
-5. Start Torch. The log should show `GVK KOTH started with 5 zones and 3 slots.` (the sample has KOTHTown too; KOTHTown is switched off) and no config warnings.
+5. Start Torch. The log should show `GVK KOTH started with 5 zones and 4 slots.` (the sample has KOTHTown too; KOTHTown is switched off) and no config warnings.
 
 ## Stage 3: fixed zones
 | # | Do | Pass when |
 |---|---|---|
-| 1 | `!koth reload` twice | Both reply "5 zones, 3 slots, no problems", and `GVK_KOTH.cfg` is unchanged on disk (comments and `SlotWarningMinutes` intact). Break a value (e.g. `Radius` -1), reload: the problem is listed. Fix it. |
+| 1 | `!koth reload` twice | Both reply "5 zones, 4 slots, no problems", and `GVK_KOTH.cfg` is unchanged on disk (comments and `SlotWarningMinutes` intact). Break a value (e.g. `Radius` -1), reload: the problem is listed. Fix it. |
 | 2 | `!koth list` as a player | Lists KharToba, Kalash, CrashedStarship, Scraptown with next times; open zones get a GPS added to your GPS list. |
 | 3 | `!koth start KharToba`, then `!koth status` | KharToba shows OPEN; chat shows "KOTH KharToba is open! GPS added." and a "KOTH KharToba" GPS appears in the GPS list (terminal GPS tab). `!koth stop KharToba` removes it. |
 | 4 | Fly a powered small grid of 50+ blocks into the zone and sit in its cockpit | `!koth status` shows counted 1 and the bar rising; after about 5 minutes chat says your faction scored 5 points and 1,000,000 SC; faction balance goes up. |

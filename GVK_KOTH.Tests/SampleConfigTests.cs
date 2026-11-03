@@ -27,7 +27,7 @@ namespace GVK.Koth.Tests
 
             KothConfig.ApplyDefaults(config);
             Assert.Equal(5, config.Zones.Count);
-            Assert.Equal(3, config.Slots.Count);
+            Assert.Equal(4, config.Slots.Count);
             Assert.Equal(new[] { 30, 10 }, config.SlotWarningMinutes);
             Assert.Empty(ConfigCheck.Run(config));
         }
