@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Threading.Tasks;
-using System.Xml.Serialization;
 using GVK.Koth.Core;
 
 namespace GVK.Koth.Services
@@ -13,21 +12,20 @@ namespace GVK.Koth.Services
     /// </summary>
     public sealed class KothData : IDisposable
     {
-        private const string ScoresFile = "Scores.xml";
-        private const string StateFile = "State.xml";
         private const string LogFile = "ScoreLog.csv";
 
         private readonly string _folder;
+        private readonly KothFileStore _store;
         private readonly BlockingCollection<Action> _writes = new BlockingCollection<Action>();
         private readonly Task _writer;
 
         public KothData(string folder)
         {
             _folder = folder;
-            Directory.CreateDirectory(folder);
+            _store = new KothFileStore(folder, OnUnreadable);
 
-            Scores = new ScoreBook(Read<ScoreData>(ScoresFile));
-            State = Read<KothState>(StateFile) ?? new KothState();
+            Scores = new ScoreBook(_store.Read<ScoreData>(KothFileStore.ScoresFile));
+            State = _store.Read<KothState>(KothFileStore.StateFile) ?? new KothState();
 
             _writer = Task.Factory.StartNew(WriteLoop, TaskCreationOptions.LongRunning);
         }
@@ -47,14 +45,14 @@ namespace GVK.Koth.Services
 
         public void SaveScores()
         {
-            string xml = Serialize(Scores.Data);
-            Queue(() => File.WriteAllText(Path.Combine(_folder, ScoresFile), xml));
+            byte[] xml = KothFileStore.Serialize(Scores.Data);
+            Queue(() => _store.Write(KothFileStore.ScoresFile, xml));
         }
 
         public void SaveState()
         {
-            string xml = Serialize(State);
-            Queue(() => File.WriteAllText(Path.Combine(_folder, StateFile), xml));
+            byte[] xml = KothFileStore.Serialize(State);
+            Queue(() => _store.Write(KothFileStore.StateFile, xml));
         }
 
         private void AppendLog(string line)
@@ -86,35 +84,10 @@ namespace GVK.Koth.Services
             }
         }
 
-        private T Read<T>(string file) where T : class
+        private void OnUnreadable(string file, string backup, Exception ex)
         {
-            string path = Path.Combine(_folder, file);
-            if (!File.Exists(path))
-                return null;
-
-            try
-            {
-                using (var reader = File.OpenRead(path))
-                    return (T)new XmlSerializer(typeof(T)).Deserialize(reader);
-            }
-            catch (Exception ex)
-            {
-                // Keep the bad file for the admin to inspect instead of overwriting it.
-                string backup = path + ".bad-" + DateTime.UtcNow.ToString("yyyyMMddHHmmss");
-                File.Copy(path, backup, true);
-                Plugin.Log.Error(ex, $"GVK KOTH: couldn't read {path}; copied it to {backup} and started empty.");
-                Plugin.Instance?.Alerts?.Send($"Couldn't read {file}; copied it to {Path.GetFileName(backup)} and started empty.");
-                return null;
-            }
-        }
-
-        private static string Serialize<T>(T data)
-        {
-            using (var writer = new StringWriter())
-            {
-                new XmlSerializer(typeof(T)).Serialize(writer, data);
-                return writer.ToString();
-            }
+            Plugin.Log.Error(ex, $"GVK KOTH: couldn't read {file}; copied it to {backup} and started empty.");
+            Plugin.Instance?.Alerts?.Send($"Couldn't read {file}; copied it to {backup} and started empty.");
         }
 
         /// <summary>Finishes queued writes. Call on session unload.</summary>
