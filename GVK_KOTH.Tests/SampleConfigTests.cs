@@ -9,7 +9,7 @@ namespace GVK.Koth.Tests
 {
     public class SampleConfigTests
     {
-        private static string FindSample()
+        internal static string FindSample()
         {
             var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
             while (dir != null && !File.Exists(Path.Combine(dir.FullName, "docs", "GVK_KOTH.sample.cfg")))

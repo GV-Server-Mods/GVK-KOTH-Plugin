@@ -43,6 +43,10 @@
       <HintPath>$(TorchDir)\DedicatedServer64\SpaceEngineers.Game.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="SpaceEngineers.ObjectBuilders">
+      <HintPath>$(TorchDir)\DedicatedServer64\SpaceEngineers.ObjectBuilders.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="VRage">
       <HintPath>$(TorchDir)\DedicatedServer64\VRage.dll</HintPath>
       <Private>False</Private>

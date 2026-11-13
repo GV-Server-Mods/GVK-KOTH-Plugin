@@ -28,6 +28,14 @@ namespace GVK.Koth.Core.Config
         /// <summary>Weekly Discord roll-up time (UTC).</summary>
         public WeeklyTime WeeklyRollup { get; set; }
 
+        /// <summary>ToolCore drill subtypes (ConveyorSorter blocks) that NoDrillRange switches off. Empty = the GVK_ToolCore_Tools drills.</summary>
+        public List<string> ToolCoreDrillSubtypes { get; set; } = new List<string>();
+
+        public static readonly string[] DefaultToolCoreDrillSubtypes =
+        {
+            "GVK_LargeBlockDrill", "GVK_SmallBlockDrill", "GVK_LargeBlockDrillReskin", "GVK_SmallBlockDrillReskin", "GVK_LargePrototechDrill"
+        };
+
         public List<ZoneProfile> Zones { get; set; } = new List<ZoneProfile>();
         public List<SlotConfig> Slots { get; set; } = new List<SlotConfig>();
 
@@ -36,6 +44,8 @@ namespace GVK.Koth.Core.Config
         {
             if (config.SlotWarningMinutes == null || config.SlotWarningMinutes.Count == 0)
                 config.SlotWarningMinutes = new List<int> { 30, 10 };
+            if (config.ToolCoreDrillSubtypes == null || config.ToolCoreDrillSubtypes.Count == 0)
+                config.ToolCoreDrillSubtypes = new List<string>(DefaultToolCoreDrillSubtypes);
             if (config.WeeklyRollup == null)
                 config.WeeklyRollup = new WeeklyTime { Day = System.DayOfWeek.Monday, Hour = 0, Minute = 0 };
             if (config.Zones == null)

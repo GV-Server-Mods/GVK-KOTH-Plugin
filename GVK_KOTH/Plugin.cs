@@ -123,8 +123,14 @@ namespace GVK.Koth
         public override void Update()
         {
             var zones = Zones;
-            if (zones == null || Config == null || !Config.Enabled)
+            if (zones == null || Config == null)
                 return;
+            if (!Config.Enabled)
+            {
+                // "false = no zones run, no rules apply": drop the rule watchers and the drill guard too.
+                zones.SuspendRules();
+                return;
+            }
 
             if (++_tick < Math.Max(1, Config.UpdateIntervalTicks))
                 return;

@@ -94,6 +94,9 @@ namespace GVK.Koth.Core.Config
         public double NoSafeZoneRange { get; set; }
         public double NoProjectorRange { get; set; }
 
+        /// <summary>Player ship drills (vanilla and ToolCore) switch off, and hand drills can't be held or dig, within this range.</summary>
+        public double NoDrillRange { get; set; }
+
         /// <summary>NPC blocks tagged [GVK-KOTH-Link] within this range switch on while the zone runs. 0 = off.</summary>
         public double LinkRange { get; set; }
     }

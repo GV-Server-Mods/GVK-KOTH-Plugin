@@ -76,9 +76,19 @@ namespace GVK.Koth.Zones
 
         public void Stop()
         {
-            SaveState();
-            _npc.Stop();
+            _rules.Stop();
+            try
+            {
+                SaveState();
+            }
+            finally
+            {
+                _npc.Stop();
+            }
         }
+
+        /// <summary>Switches the KOTH rules off while the plugin's master switch is off.</summary>
+        public void SuspendRules() => _rules.Stop();
 
         /// <summary>Builds the zones from the config, keeping saved bars and loot queues.</summary>
         public void Rebuild()
@@ -86,6 +96,9 @@ namespace GVK.Koth.Zones
             foreach (var zone in _zones.Values)
                 zone.StoreState();
             _zones.Clear();
+
+            // Drop rule watchers that point at the old zones; the next check rebuilds them from the new config.
+            _rules.Stop();
 
             foreach (var profile in Config.Zones)
             {
@@ -125,7 +138,7 @@ namespace GVK.Koth.Zones
 
             var zones = Zones.ToList();
             _npc.Links.Apply(zones.Where(z => z.Active && z.Profile.Mode != ZoneMode.RulesOnly).ToList());
-            _rules.Apply(zones, now);
+            _rules.Apply(zones, now, Config.ToolCoreDrillSubtypes);
             PublishActiveProfiles(zones);
             _plugin.Sync?.Tick(this, dt, now);
 
