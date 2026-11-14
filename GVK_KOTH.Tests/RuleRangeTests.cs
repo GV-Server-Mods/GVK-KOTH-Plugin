@@ -80,5 +80,19 @@ namespace GVK.Koth.Tests
             Assert.Equal(3000, scraptown.NoLargeGridPowerRange);
             Assert.Equal(4000, scraptown.NoSafeZoneRange);
         }
+
+        [Fact]
+        public void Sample_Scraptown_is_captured_on_foot_only()
+        {
+            // Large-grid power and thrusters are off around Scraptown, so a grid-captured zone could never be taken.
+            KothConfig config;
+            using (var reader = File.OpenRead(SampleConfigTests.FindSample()))
+                config = (KothConfig)new XmlSerializer(typeof(KothConfig)).Deserialize(reader);
+
+            var scraptown = config.Zones.Single(z => z.Name == "Scraptown");
+            Assert.True(scraptown.OnFoot);
+            Assert.False(scraptown.SmallGrids);
+            Assert.False(scraptown.LargeGrids);
+        }
     }
 }

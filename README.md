@@ -18,7 +18,7 @@ King of the Hill for the GV: Deserts of Kharak (GVK) Space Engineers server, as 
 | Zone | Where | Runs | Who counts |
 |---|---|---|---|
 | `KharToba`, `Kalash`, `CrashedStarship` | Fixed coordinates | Weekly slots, one picked at random from the pool | Capture; Kalash and Crashed Starship small grids only |
-| `Scraptown` | Fixed coordinates | Always | Capture, large grids |
+| `Scraptown` | Fixed coordinates | Always | Capture, players on foot only |
 | `KOTHTown` | Fixed coordinates of the NST KOTH Town | Always, but switched off in the sample until the town's spawn group is re-enabled in GVK_Derelicts | Encampment, 3,000 m |
 
 Every zone except `KOTHTown` sets rules: drills 3,000 m, safe zones and projectors 4,000 m, large-grid power 3,000 m (not Khar Toba), thrusters 3,000 m (Crashed Starship and Scraptown).
