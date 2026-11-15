@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using GVK.Koth.Core;
 using GVK.Koth.Core.Config;
 using GVK.Koth.Services;
 using NLog;
@@ -19,8 +20,8 @@ namespace GVK.Koth.Zones
 {
     /// <summary>
     /// KOTH rules around each zone, replacing the GVK_Settings per-block scripts: player thrusters, large-grid
-    /// power, player safe zones, projectors and drills are switched off within each zone's ranges, and hand drills
-    /// are unequipped. Fixed zones apply their rules all the time; NPC zones while their grid is here and the zone
+    /// power, player safe zones, projectors and drills are switched off within each zone's ranges, hand drills
+    /// are unequipped, and offline faction safe zones are deleted. Fixed zones apply their rules all the time; NPC zones while their grid is here and the zone
     /// hasn't ended. A block inside a range is watched, so switching it back on (terminal, timer, script) is undone
     /// at once, as the old scripts did. Game thread only.
     /// </summary>
@@ -100,7 +101,59 @@ namespace GVK.Koth.Zones
 
             DrillGuard.SetZones(_drillSpheres.ToArray());
             ApplyToHandDrills(now);
+            RemoveOfflineSafeZones(now);
             UnwatchMissed();
+        }
+
+        /// <summary>
+        /// Deletes DynamicSafeZones offline faction zones whose centre is within a zone's NoSafeZoneRange. They are
+        /// entities, so the safe zone block rule misses them. The mod makes one per grid each time a faction goes
+        /// offline and doesn't rebuild a deleted one until the faction logs on and off again.
+        /// </summary>
+        private void RemoveOfflineSafeZones(DateTime now)
+        {
+            bool any = false;
+            foreach (var zone in _enforcing)
+                any |= zone.Profile.NoSafeZoneRange > 0;
+            if (!any)
+                return;
+
+            foreach (var safeZone in MySessionComponentSafeZones.SafeZones)
+            {
+                if (safeZone.MarkedForClose || safeZone.SafeZoneBlockId != 0 || !OfflineSafeZones.IsOfflineZone(safeZone.DisplayName))
+                    continue;
+
+                var position = safeZone.PositionComp.GetPosition();
+                foreach (var zone in _enforcing)
+                {
+                    double range = zone.Profile.NoSafeZoneRange;
+                    if (range <= 0 || Vector3D.DistanceSquared(position, zone.Center) > range * range)
+                        continue;
+
+                    string name = safeZone.DisplayName;
+                    var faction = safeZone.Factions.Count > 0 ? safeZone.Factions[0] : null;
+                    safeZone.Close();
+                    ReportOfflineZone(name, faction, zone.Name, range, now);
+                    break;
+                }
+            }
+        }
+
+        private void ReportOfflineZone(string zoneName, IMyFaction faction, string siteName, double range, DateTime now)
+        {
+            string grid = MyEntities.TryGetEntityById(OfflineSafeZones.GridId(zoneName), out var entity) ? entity.DisplayName : null;
+            Log.Info($"GVK KOTH: removed offline safe zone '{zoneName}' (faction {faction?.Tag ?? "?"}, grid '{grid ?? "?"}') within {range:0} m of {siteName}.");
+            if (faction == null)
+                return;
+
+            string key = $"FSZ|{faction.FactionId}|{siteName}";
+            if (_lastNotice.TryGetValue(key, out var last) && now - last < NoticeInterval)
+                return;
+            _lastNotice[key] = now;
+
+            string km = (range / 1000).ToString("0.#", CultureInfo.InvariantCulture);
+            string on = grid != null ? $" on {grid}" : "";
+            _announce.Faction(faction, $"KOTH rule: your offline safe zone{on} was removed. No safe zones within {km} km of {siteName}.");
         }
 
         /// <summary>

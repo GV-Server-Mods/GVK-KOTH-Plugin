@@ -2,7 +2,7 @@
 
 King of the Hill for the GV: Deserts of Kharak (GVK) Space Engineers server, as a Torch plugin. It replaces the King of the Hill - The Complete Edition mod (Workshop 2388326362) and the Space-Chemist KOTH plugin.
 
-**Status:** plugin code complete for the #741 feature list and in testing; the player HUD is on the GVK_Settings branch `feat/koth-client`. 70 rule tests pass (`dotnet test GVK_KOTH.Tests`). In game, only the first round of fixed-zone tests (Khar Toba, 2026-10-28) has run; NPC zones, rules, the API, Flying KOTH and the player HUD are untested in game ([TEST_PLAN.md](TEST_PLAN.md)). The design and the full feature list are in [GVK-Settings#741](https://github.com/GV-Server-Mods/GVK-Settings/issues/741).
+**Status:** plugin code complete for the #741 feature list and in testing; the player HUD is on the GVK_Settings branch `feat/koth-client`. 83 rule tests pass (`dotnet test GVK_KOTH.Tests`). In game, only the first round of fixed-zone tests (Khar Toba, 2026-10-28) has run; NPC zones, rules, the API, Flying KOTH and the player HUD are untested in game ([TEST_PLAN.md](TEST_PLAN.md)). The design and the full feature list are in [GVK-Settings#741](https://github.com/GV-Server-Mods/GVK-Settings/issues/741).
 
 ## How KOTH works on GVK
 - Every faction in a zone fills one shared capture bar; more players fill it faster (levelling off below 2x).
@@ -10,6 +10,7 @@ King of the Hill for the GV: Deserts of Kharak (GVK) Space Engineers server, as 
 - Zone points from all factions together drop loot into a public container that players fight over.
 - Zones run on weekly slots (a random zone per slot), all the time, or for a set time on an NPC grid.
 - Rules apply around each enabled fixed zone all the time, whether or not it is open, and around an NPC zone while its grid is here and the zone hasn't ended; never to NPC grids, and not while the plugin's master switch is off. Each rule has its own range (0 = off): player thrusters, large-grid power, safe zones, projectors and drills switch off. A block switched back on inside its range (terminal, timer, script) is switched off again at once.
+- The safe zone rule also deletes Offline Faction Safezones from the DynamicSafeZones mod (named `(FSZ)_TAG_gridId`) whose centre is inside `NoSafeZoneRange`, within a second of the mod making one. They are entities, not blocks. The removal is logged, and the faction is told in private chat (members online) and in its Discord channel through SEDiscordBridge, if SEDB is installed and has a `FactionChannels` entry for the faction's name. Admin and other safe zones are left alone.
 - The drill rule covers vanilla ship drills, the ToolCore drills in `ToolCoreDrillSubtypes`, and hand drills. Two server-side patches on game code back it up: the server refuses to let a player take out a hand drill inside the range (the check Keen uses for the block placer in safe zones), and a hand drill or vanilla ship drill there digs nothing, even fired from a cockpit. A hand drill carried into the range is put away at the next check.
 
 ## Zones in the sample config
