@@ -93,16 +93,16 @@ Setup: a zone with `Attach` NpcTag, `Activation` Slot, `SpawnGroup` set to the a
 | 2 | Restart Torch during the slot | No second airship spawns. |
 | 3 | Slot ends | MES despawns the airship (its own behavior timer); the zone ends quietly. |
 
-## Stage 8: player HUD (GVK_Settings branch `feat/koth-client`)
-The test server needs a GVK_Settings build from that branch (published to a test Workshop item, or the server's local mod copy).
+## Stage 8: player HUD (GVK_Settings main, published 2026-11-23)
+The KOTH client is in GVK_Settings main and the published mod. Its HUD now draws with the game's screen API (SE 1.211), so the test server must run 1.211.
 
 | # | Do | Pass when |
 |---|---|---|
-| 1 | Open a zone (`!koth start KharToba`), open the satellite map (M) | A flashing orange KOTH marker labelled "KOTH KharToba 0%" with a dotted ring; the % updates while capturing. |
+| 1 | Open a zone (`!koth start KharToba`), open the satellite map (`=`) | A flashing orange KOTH marker labelled "KOTH KharToba 0%" with a dotted ring; the % updates while capturing. |
 | 2 | Check the corner minimap and the compass ribbon | The same flashing marker on both. |
-| 3 | F2 > each settings submenu > KOTH toggle | Each hides KOTH markers in that view only; the setting survives a relog. |
+| 3 | `/gvk settings` > the KOTH toggle on the Radar & Minimap, Compass and Satellite Map tabs | Each hides KOTH markers in that view only; the setting survives a relog. |
 | 4 | With a slot scheduled later | The next slot's zone shows as a steady, dimmed marker with its local start time. |
-| 5 | Fly into the open zone | The capture panel appears on the left (name, %, bar, counted); it hides when you leave. |
+| 5 | Fly into the open zone | The capture panel appears on the left (name, %, bar, counted), its second line evenly under the first; it hides when you leave, when you press Tab, and while the satellite map is open. |
 | 6 | Approach within 1 km of the zone edge | A faint orange wireframe sphere marks the capture radius. |
 | 7 | Complete a bar | Firework bursts above the zone for players within 5 km. |
 | 7b | Flying KOTH: fly near the moving airship | The boundary sphere moves smoothly with it (no once-a-second jumps); the panel appears as soon as you're inside. |
